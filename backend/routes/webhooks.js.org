@@ -1,0 +1,270 @@
+const express = require('express');
+const crypto = require('crypto');
+const { body, validationResult } = require('express-validator');
+const { Pool } = require('pg');
+const zoomUtils = require('../utils/zoom');
+const QueueService = require('../services/queueService');
+
+const router = express.Router();
+
+// データベース接続とサービス初期化
+const db = new Pool({
+	connectionString: process.env.DATABASE_URL,
+});
+
+const queueService = new QueueService();
+
+// Zoom Webhook署名検証ミドルウェア
+const verifyZoomWebhook = (req, res, next) => {
+	console.log( "/webhook/verifyZoomWebhook--->", "start" );
+
+	try {
+		console.log('署名検証ミドルウェア開始:', {
+			event: req.body?.event,
+			hasSignature: !!req.headers['x-zm-signature'],
+			hasTimestamp: !!req.headers['x-zm-request-timestamp']
+		});
+		// URL validationイベントは署名検証を行う（Zoom公式仕様）
+		if (req.body.event === 'endpoint.url_validation') {
+			console.log('URL validation用署名検証を実行');
+			// 通常の署名検証処理を続行
+		}
+		const message = `v0:${req.headers['x-zm-request-timestamp']}:${JSON.stringify(req.body)}`;
+		const hashForVerify = crypto.createHmac('sha256', process.env.ZOOM_WEBHOOK_SECRET)
+			.update(message)
+			.digest('hex');
+		const signature = `v0=${hashForVerify}`;
+		
+		// 署名検証の詳細ログ
+		console.log('署名検証詳細:', {
+			timestamp: req.headers['x-zm-request-timestamp'],
+			body: JSON.stringify(req.body),
+			calculated_signature: signature,
+			received_signature: req.headers['x-zm-signature'],
+			signatures_match: req.headers['x-zm-signature'] === signature
+		});
+		
+		if (req.headers['x-zm-signature'] !== signature) {
+			console.warn('Zoom Webhook署名検証失敗');
+			console.warn('署名不一致:', {
+				expected: signature,
+				received: req.headers['x-zm-signature']
+			});
+			return res.status(401).json({
+				error: 'Webhook署名が無効です'
+			});
+		}
+		
+		console.log('署名検証成功');
+		
+		next();
+	} catch (error) {
+		console.error('Zoom Webhook署名検証エラー:', error);
+		res.status(400).json({
+			error: 'Webhook署名検証中にエラーが発生しました'
+		});
+	}
+};
+
+// Zoom Webhook受信エンドポイント
+router.post('/zoom', verifyZoomWebhook, async (req, res) => {
+	console.log( "/webhook/zoom(post) --->", "start" );
+
+	try {
+		const { event, payload } = req.body;
+		
+		console.log('Zoom Webhookを受信:', {
+			event,
+			meeting_id: payload?.object?.id,
+			topic: payload?.object?.topic,
+			headers: {
+				'x-zm-signature': req.headers['x-zm-signature'] ? 'present' : 'missing',
+				'x-zm-request-timestamp': req.headers['x-zm-request-timestamp'] ? 'present' : 'missing'
+			}
+		});
+		
+		// イベントタイプに応じた処理
+		switch (event) {
+			case 'endpoint.url_validation':
+				// Zoom Webhook URL検証イベント
+				console.log('Zoom Webhook URL検証要求を受信');
+				console.log('Payload内容:', JSON.stringify(payload, null, 2));
+				// ZoomのplainTokenを返送（複数形式対応）
+				if (payload && payload.plainToken) {
+					console.log('plainToken値を返送:', payload.plainToken);
+					
+					// 方法4: 最もシンプルなレスポンス（最後の手段）
+					console.log('方法4: 最もシンプルなレスポンス');
+					res.status(200).send('Webhook received');
+				} else {
+					// plainTokenがない場合は失敗レスポンス
+					console.error('plainTokenが見つかりません');
+					res.status(400).send('Webhook error received');
+				}
+				
+/*				
+				// ZoomのplainTokenを返送（複数形式対応）
+				if (payload && payload.plainToken) {
+					console.log('plainToken値を返送:', payload.plainToken);
+					
+					// 方法4: 最もシンプルなレスポンス（最後の手段）
+					console.log('方法4: 最もシンプルなレスポンス');
+					res.writeHead(200);
+					res.end(payload.plainToken);
+					console.log('超シンプルレスポンス送信完了:', payload.plainToken);
+					return;
+				}
+				
+				// plainTokenがない場合は失敗レスポンス
+				console.error('plainTokenが見つかりません');
+				return res.status(400).json({ error: 'plainToken is required for validation' });
+*/
+				break;
+			case 'recording.completed':
+				await handleRecordingCompleted(payload);
+				break;
+			case 'meeting.ended':
+				await handleMeetingEnded(payload);
+				break;
+			default:
+				console.log(`未サポートのイベントタイプ: ${event}`);
+		}
+		
+		res.status(200).json({
+			message: 'Webhook処理完了'
+		});
+		
+	} catch (error) {
+		console.error('Zoom Webhook処理エラー:', error);
+		res.status(500).json({
+			error: 'Webhook処理中にエラーが発生しました'
+		});
+	}
+});
+
+// 録画完了イベントの処理
+const handleRecordingCompleted = async (payload) => {
+	console.log( "/webhook/handleRecordingCompleted-->", "start" );
+
+	try {
+		console.log('録画完了イベントを処理中...', {
+			meeting_id: payload.object.id,
+			topic: payload.object.topic
+		});
+		
+		// 1. agent_jobsテーブルにジョブを記録
+		const agentJobId = await createAgentJob('zoom_transcript', payload);
+		
+		// 2. 議事録生成ジョブをキューに追加
+		await queueService.addTranscriptJob({
+			agentJobId: agentJobId,
+			zoomData: payload
+		});
+		
+		console.log(`録画完了イベント処理完了: ジョブID ${agentJobId}`);
+		
+	} catch (error) {
+		console.error('録画完了イベント処理エラー:', error);
+		throw error;
+	}
+};
+
+// 会議終了イベントの処理
+const handleMeetingEnded = async (payload) => {
+	console.log( "/webhook/handleMeetingEnded-->", "start" );
+
+	try {
+		console.log('会議終了イベントを処理中...', {
+			meeting_id: payload.object.id,
+			topic: payload.object.topic
+		});
+		
+		// 会議情報を記録（録画完了待機）
+		const agentJobId = await createAgentJob('meeting_ended', payload);
+		
+		console.log(`会議終了イベント処理完了: ジョブID ${agentJobId}`);
+		
+	} catch (error) {
+		console.error('会議終了イベント処理エラー:', error);
+		throw error;
+	}
+};
+
+// Webhook検証用エンドポイント（Zoom設定時）
+router.get('/zoom', (req, res) => {
+	console.log( "/webhook/zoom(get) -->", "start" );
+
+	const challenge = req.query.challenge;
+	if (challenge) {
+		res.status(200).json({
+			challenge: challenge
+		});
+	} else {
+		res.status(400).json({
+			error: 'チャレンジパラメータが必要です'
+		});
+	}
+});
+
+/**
+ * エージェントジョブを作成
+ * @param {string} type - ジョブタイプ
+ * @param {Object} payload - Zoom webhook ペイロード
+ * @param {number|null} userId - ジョブ作成者ID（オプション）
+ * @returns {Promise<number>} エージェントジョブID
+ */
+const createAgentJob = async (type, payload, userId = null) => {
+	try {
+		// Zoom webhookの場合、host_emailからユーザーIDを取得を試みる
+		let createdBy = userId;
+		
+		if (!createdBy && payload.object?.host_email) {
+			try {
+				const userResult = await db.query(
+					'SELECT id FROM users WHERE email = $1 AND is_active = true',
+					[payload.object.host_email]
+				);
+				
+				if (userResult.rows.length > 0) {
+					createdBy = userResult.rows[0].id;
+					console.log(`Zoomホストメール ${payload.object.host_email} をユーザーID ${createdBy} にリンク`);
+				} else {
+					console.log(`Zoomホストメール ${payload.object.host_email} はシステムユーザーとして未登録`);
+				}
+			} catch (userError) {
+				console.warn('ホストメールからユーザー検索エラー:', userError);
+			}
+		}
+		
+		const insertQuery = `
+			INSERT INTO agent_jobs (type, status, created_by, trigger_data, input_data)
+			VALUES ($1, $2, $3, $4, $5)
+			RETURNING id
+		`;
+		
+		const values = [
+			type,
+			'pending',
+			createdBy, // NULL可（システムジョブの場合）
+			JSON.stringify(payload),
+			JSON.stringify({
+				meeting_id: payload.object.id,
+				topic: payload.object.topic,
+				start_time: payload.object.start_time,
+				host_email: payload.object.host_email
+			})
+		];
+		
+		const result = await db.query(insertQuery, values);
+		const agentJobId = result.rows[0].id;
+		
+		console.log(`エージェントジョブを作成しました: ${type} (ID: ${agentJobId}) - 作成者: ${createdBy || 'システム'}`);
+		return agentJobId;
+		
+	} catch (error) {
+		console.error('エージェントジョブ作成エラー:', error);
+		throw new Error(`エージェントジョブ作成に失敗しました: ${error.message}`);
+	}
+};
+
+module.exports = router;

@@ -1,0 +1,6 @@
+-- マイグレーション履歴管理テーブル
+CREATE TABLE IF NOT EXISTS migration_log (
+	id SERIAL PRIMARY KEY,
+	migration_name VARCHAR(255) UNIQUE NOT NULL,
+	executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

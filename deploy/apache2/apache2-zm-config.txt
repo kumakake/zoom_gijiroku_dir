@@ -1,0 +1,7 @@
+# 既存のtools.cross-astem.jpのVirtualHostの"###ここまで###"の直前に以下を追加
+
+# -- Zoom議事録自動配布システム
+    ProxyPass /zm/api/        http://localhost:8000/api/
+    ProxyPassReverse /zm/api/ http://localhost:8000/api/
+    ProxyPass /zm/           http://localhost:3000/zm/
+    ProxyPassReverse /zm/    http://localhost:3000/zm/

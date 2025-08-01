@@ -1,0 +1,16 @@
+# SSH設定例
+# ~/.ssh/config に追加してください
+
+Host zm01-prod
+    HostName zm01.ast-tools.online
+    User ubuntu
+    Port 56890
+    IdentityFile ~/.ssh/hit_tr01_key.pem
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    LogLevel ERROR
+
+# 使用例:
+# ssh zm01-prod
+# scp file.txt zm01-prod:/tmp/
+# rsync -av --delete dist/ zm01-prod:/opt/zm01.ast-tools.online/public_html/

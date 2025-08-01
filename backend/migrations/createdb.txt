@@ -1,0 +1,2 @@
+CREATE USER ai_agent WITH PASSWORD 'aiAgenP0ss';
+CREATE DATABASE ai_agent_prod OWNER ai_agent;

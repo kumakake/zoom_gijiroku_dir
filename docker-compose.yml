@@ -1,0 +1,77 @@
+services:
+  # PostgreSQL Database
+  # # psql -U postgres ai_agent_dev
+  # select id, pgp_sym_decrypt( zoom_client_secret_encrypted,  'dev_jwt_secret_12345' ) from zoom_tenant_settings;
+  db:
+    image: postgres:15
+    container_name: ai-agent-db
+    environment:
+      POSTGRES_DB: ai_agent_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/migrations:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+
+  # Redis for Bull Queue
+  redis:
+    image: redis:7-alpine
+    container_name: ai-agent-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # MailHog for Email Testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: ai-agent-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    restart: unless-stopped
+
+  # Backend API Server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: ai-agent-backend
+    env_file:
+      - .env.development
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - backend_node_modules:/app/node_modules
+    depends_on:
+      - db
+      - redis
+      - mailhog
+    command: ["sh", "-c", "node workers/transcriptWorker.js & node workers/emailWorker.js & node server.js"]
+    restart: unless-stopped
+
+  # Frontend React + Vite
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: ai-agent-frontend
+    env_file:
+      - .env.development
+    ports:
+      - "3000:3000"
+      - "3001:3001"  # HMR port
+    volumes:
+      - frontend_dist:/app/dist
+    depends_on:
+      - backend
+    command: npx vite --host 0.0.0.0 --port 3000
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  backend_node_modules:
+  frontend_dist:
