@@ -3,7 +3,7 @@ import { toast } from 'react-hot-toast';
 
 // API クライアントのベース設定
 const createApiClient = (): AxiosInstance => {
-  const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  const baseURL = import.meta.env.VITE_API_URL || '';
   
   const client = axios.create({
     baseURL,
