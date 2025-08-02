@@ -22,15 +22,25 @@ class TranscriptWorker {
 		this.queueService = new QueueService();
 		this.tenantZoomService = tenantZoomService;
 
-		// Redis設定
-		this.redisConfig = {
-			redis: {
-				port: process.env.REDIS_PORT || 6379,
-				host: process.env.REDIS_HOST || 'redis',
-				password: process.env.REDIS_PASSWORD || null,
-				db: 0,
-			}
-		};
+		// Redis設定（開発・本番環境統一）
+		let redisConfig;
+		if (process.env.REDIS_URL) {
+			// REDIS_URLが設定されている場合（本番・開発共通）
+			console.log('📡 TranscriptWorker REDIS_URLを使用:', process.env.REDIS_URL.replace(/:([^:@]+)@/, ':***@'));
+			redisConfig = process.env.REDIS_URL;
+		} else {
+			// 個別設定（フォールバック）
+			console.log('🔧 TranscriptWorker 個別Redis設定を使用:', `${process.env.REDIS_HOST || 'redis'}:${process.env.REDIS_PORT || 6379}`);
+			redisConfig = {
+				redis: {
+					port: process.env.REDIS_PORT || 6379,
+					host: process.env.REDIS_HOST || 'redis',
+					password: process.env.REDIS_PASSWORD || null,
+					db: 0,
+				}
+			};
+		}
+		this.redisConfig = redisConfig;
 
 		// ワーカー初期化
 		this.transcriptQueue = new Bull('transcript processing', this.redisConfig);
