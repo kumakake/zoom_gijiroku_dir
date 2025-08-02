@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Users, BarChart3, Calendar, ArrowLeft, Bug } from 'lucide-react';
 import { tenantAdminApi } from '../lib/api';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import { Bug, ArrowLeft, Users, BarChart3, Calendar } from 'lucide-react';
 
 interface TenantInfo {
   tenant_id: string;

@@ -246,6 +246,17 @@ export const tenantApi = {
     const response = await api.get(`/admin/tenants/${tenantId}/zoom-settings`);
     return response.data;
   },
+
+  // テナント別Zoom設定更新
+  updateZoomSettings: async (tenantId: string, data: {
+    zoom_account_id?: string;
+    zoom_client_id?: string;
+    zoom_client_secret?: string;
+    zoom_webhook_secret?: string;
+  }) => {
+    const response = await api.put(`/admin/tenants/${tenantId}/zoom-settings`, data);
+    return response.data;
+  },
 }
 
 // テナント管理者用API

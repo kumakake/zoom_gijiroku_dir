@@ -53,6 +53,9 @@ interface TestResult {
     totalSteps?: number;
     errors?: string[];
   };
+  summary?: any;
+  scope_tests?: any[];
+  recommendations?: any[];
 }
 
 interface QueueStatus {

@@ -9,7 +9,7 @@ AIエージェントサービス - Zoom議事録自動配布システムの本�
 ### アーキテクチャ構成
 - **バックエンド**: Express.js + Node.js
 - **フロントエンド**: React + Vite + TypeScript
-- **データベース**: PostgreSQL 15
+- **データベース**: PostgreSQL 16
 - **キューシステム**: Redis 7 + Bull Queue
 - **プロセス管理**: PM2 Cluster Mode
 - **Webサーバー**: Nginx (リバースプロキシ)
@@ -18,7 +18,7 @@ AIエージェントサービス - Zoom議事録自動配布システムの本�
 ```
 Frontend: React 19 + Vite 5 + TypeScript + Tailwind CSS 4
 Backend:  Express.js + Node.js 22
-Database: PostgreSQL 15 + Redis 7
+Database: PostgreSQL 16 + Redis 7
 Process:  PM2 + Nginx
 AI APIs:  OpenAI Whisper + Anthropic Claude
 ```
@@ -38,9 +38,9 @@ sudo apt-get install -y nodejs
 # PM2 グローバルインストール
 sudo npm install -g pm2
 
-# PostgreSQL 15 インストール
+# PostgreSQL 16 インストール
 sudo apt update
-sudo apt install postgresql-15 postgresql-contrib-15
+sudo apt install postgresql-16 postgresql-contrib-16
 
 # Redis インストール
 sudo apt install redis-server
@@ -55,15 +55,15 @@ sudo apt install git build-essential python3 python3-pip
 #### 1.2 ディレクトリ構造作成
 ```bash
 # アプリケーションディレクトリ
-sudo mkdir -p /opt/ai-agent-service
+sudo mkdir -p /opt/zm01.ast-tools.online
 sudo mkdir -p /var/log/ai-agent
 sudo mkdir -p /var/lib/ai-agent
 
 # 権限設定
-sudo useradd -r -d /opt/ai-agent-service -s /bin/bash aiagent
-sudo chown -R aiagent:aiagent /opt/ai-agent-service
-sudo chown -R aiagent:aiagent /var/log/ai-agent
-sudo chown -R aiagent:aiagent /var/lib/ai-agent
+sudo useradd -r -d /opt/zm01.ast-tools.online -s /bin/bash ubuntu
+sudo chown -R ubuntu:ubuntu /opt/zm01.ast-tools.online
+sudo chown -R ubuntu:ubuntu /var/log/ai-agent
+sudo chown -R ubuntu:ubuntu /var/lib/ai-agent
 ```
 
 ### 2. データベースセットアップ
@@ -74,8 +74,8 @@ sudo chown -R aiagent:aiagent /var/lib/ai-agent
 sudo -u postgres psql
 
 -- 本番用データベースとユーザー作成
-CREATE DATABASE ai_agent_prod;
 CREATE USER ai_agent WITH ENCRYPTED PASSWORD 'aiAgenP0ss';
+CREATE DATABASE ai_agent_prod OWNER ai_agent;
 GRANT ALL PRIVILEGES ON DATABASE ai_agent_prod TO ai_agent;
 GRANT ALL ON SCHEMA public TO ai_agent;
 
@@ -107,28 +107,35 @@ sudo systemctl enable redis-server
 
 #### 3.1 ソースコード配置
 ```bash
-# aiagentユーザーに切り替え
-sudo -u aiagent -s
+# ubuntuユーザーに切り替え
+sudo -u ubuntu -s
 
 # アプリケーションディレクトリに移動
-cd /opt/ai-agent-service
+cd /opt/zm01.ast-tools.online
 
 # GitHubからクローン（または直接アップロード）
 git clone https://github.com/your-repo/ai-agent-service.git .
 
 # または直接ファイル転送
-# scp -r ./ai-agent-service/* user@server:/opt/ai-agent-service/
+# scp -r ./ai-agent-service/* user@server:/opt/zm01.ast-tools.online/
 ```
 
 #### 3.2 バックエンド構築
 ```bash
 # バックエンドディレクトリ
-cd /opt/ai-agent-service/backend
+cd /opt/zm01.ast-tools.online/backend
 
 # 依存関係インストール
 npm install --production
 
 # マイグレーション実行
+※スキーマファイルは backend/migrations/schema.sql
+$ pwd
+/opt/zm01.ast-tools.online
+$ psql -U ai_agent ai_agent_prod < backend/migrations/schema.sql
+
+
+開発環境のデータベースをダンプしてリストアするので、以下の処理は不要
 psql -h localhost -U ai_agent -d ai_agent_prod -f migrations/001_create_tenant_tables.sql
 psql -h localhost -U ai_agent -d ai_agent_prod -f migrations/002_add_tenant_columns.sql
 psql -h localhost -U ai_agent -d ai_agent_prod -f migrations/003_create_base_tables.sql
@@ -139,14 +146,15 @@ psql -h localhost -U ai_agent -d ai_agent_prod -f migrations/007_decrypt_client_
 psql -h localhost -U ai_agent -d ai_agent_prod -f migrations/008_convert_to_bytea_encryption.sql
 
 # ecosystem.config.js を本番環境に合わせて修正
-cp ecosystem.config.js ecosystem.config.prod.js
-nano ecosystem.config.prod.js
+ecosystem.config.js を ecosystem.config.prod.jsなど他ファイル名にするとpm2が認識しないので注意。
+cp ecosystem.config.js ecosystem.config.js.backup
+nano ecosystem.config.js
 ```
 
 #### 3.3 フロントエンド構築
 ```bash
 # フロントエンドディレクトリ
-cd /opt/ai-agent-service/frontend
+cd /opt/zm01.ast-tools.online/frontend
 
 # 依存関係インストール
 npm install
@@ -197,7 +205,7 @@ server {
 
     # 静的ファイル配信（Viteビルド結果）
     location / {
-        root /opt/ai-agent-service/frontend/dist;
+        root /opt/zm01.ast-tools.online/frontend/dist;
         try_files $uri $uri/ /index.html;
         
         # キャッシュ設定
@@ -318,7 +326,7 @@ pm2 logs
 
 # PM2自動起動設定
 pm2 startup
-sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u aiagent --hp /opt/ai-agent-service
+sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u ubuntu --hp /opt/zm01.ast-tools.online
 pm2 save
 ```
 
@@ -336,7 +344,7 @@ sudo systemctl enable redis-server
 sudo systemctl enable nginx
 
 # PM2サービス確認
-sudo systemctl status pm2-aiagent
+sudo systemctl status pm2-ubuntu
 ```
 
 ### 8. 動作確認
@@ -364,7 +372,7 @@ curl -k https://zm01.ast-tools.online/api/health
 curl -k https://zm01.ast-tools.online/
 
 # データベース接続確認
-cd /opt/ai-agent-service/backend
+cd /opt/zm01.ast-tools.online/backend
 node -e "
 const { Pool } = require('pg');
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -464,12 +472,12 @@ sudo ufw deny 6379/tcp  # Redis外部アクセス禁止
 
 ### 2. システムユーザー設定
 ```bash
-# aiagentユーザーの制限
-sudo usermod -s /bin/bash aiagent  # シェルアクセス有効
-sudo passwd -l aiagent             # パスワードログイン無効
+# ubuntuユーザーの制限
+sudo usermod -s /bin/bash ubuntu  # シェルアクセス有効
+sudo passwd -l ubuntu             # パスワードログイン無効
 
 # sudoers設定（必要に応じて）
-echo "aiagent ALL=(ALL) NOPASSWD:/usr/bin/systemctl restart pm2-aiagent" | sudo tee /etc/sudoers.d/aiagent
+echo "ubuntu ALL=(ALL) NOPASSWD:/usr/bin/systemctl restart pm2-ubuntu" | sudo tee /etc/sudoers.d/ubuntu
 ```
 
 ### 3. ログローテーション
@@ -486,7 +494,7 @@ sudo nano /etc/logrotate.d/ai-agent
     delaycompress
     missingok
     notifempty
-    create 0644 aiagent aiagent
+    create 0644 ubuntu ubuntu
     postrotate
         pm2 reloadLogs
     endscript
@@ -500,7 +508,7 @@ sudo nano /etc/logrotate.d/ai-agent
 ### 1. ヘルスチェック設定
 ```bash
 # ヘルスチェックスクリプト作成
-nano /opt/ai-agent-service/scripts/health-check.sh
+nano /opt/zm01.ast-tools.online/scripts/health-check.sh
 ```
 
 ```bash
@@ -515,7 +523,7 @@ if [ "$API_STATUS" != "200" ]; then
 fi
 
 # データベース確認
-DB_STATUS=$(cd /opt/ai-agent-service/backend && node -e "
+DB_STATUS=$(cd /opt/zm01.ast-tools.online/backend && node -e "
 const { Pool } = require('pg');
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 pool.query('SELECT 1', (err) => {
@@ -540,12 +548,12 @@ echo "All services OK"
 ### 2. 定期メンテナンス
 ```bash
 # crontab設定
-sudo crontab -u aiagent -e
+sudo crontab -u ubuntu -e
 ```
 
 ```cron
 # ヘルスチェック（5分毎）
-*/5 * * * * /opt/ai-agent-service/scripts/health-check.sh >> /var/log/ai-agent/health.log 2>&1
+*/5 * * * * /opt/zm01.ast-tools.online/scripts/health-check.sh >> /var/log/ai-agent/health.log 2>&1
 
 # PM2ログクリア（毎日）
 0 2 * * * pm2 flush
@@ -557,7 +565,7 @@ sudo crontab -u aiagent -e
 ### 3. バックアップ設定
 ```bash
 # バックアップスクリプト作成
-nano /opt/ai-agent-service/scripts/backup.sh
+nano /opt/zm01.ast-tools.online/scripts/backup.sh
 ```
 
 ```bash
@@ -572,7 +580,7 @@ pg_dump -h localhost -U ai_agent -d ai_agent_prod > $BACKUP_DIR/db_backup_$DATE.
 
 # 設定ファイルバックアップ  
 tar -czf $BACKUP_DIR/config_backup_$DATE.tar.gz \
-    /opt/ai-agent-service/backend/ecosystem.config.js \
+    /opt/zm01.ast-tools.online/backend/ecosystem.config.js \
     /etc/nginx/sites-available/ai-agent-service
 
 # 古いバックアップ削除（30日以上）
@@ -592,7 +600,7 @@ find $BACKUP_DIR -name "*.tar.gz" -mtime +30 -delete
 node --version  # v22以上が必要
 
 # 依存関係再インストール
-cd /opt/ai-agent-service/frontend
+cd /opt/zm01.ast-tools.online/frontend
 rm -rf node_modules package-lock.json
 npm install
 npm run build
@@ -640,7 +648,7 @@ tail -f /var/log/nginx/ai-agent-access.log
 tail -f /var/log/nginx/ai-agent-error.log
 
 # システムログ
-journalctl -u pm2-aiagent -f
+journalctl -u pm2-ubuntu -f
 journalctl -u nginx -f
 ```
 
@@ -689,7 +697,7 @@ save 60 10000
 
 ### インフラストラクチャ
 - [ ] Node.js 22 LTS インストール
-- [ ] PostgreSQL 15 セットアップ
+- [ ] PostgreSQL 16 セットアップ
 - [ ] Redis 7 セットアップ
 - [ ] Nginx インストール・設定
 - [ ] SSL証明書設定

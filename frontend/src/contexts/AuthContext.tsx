@@ -5,7 +5,7 @@ interface User {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'user' | 'tenant_admin';
   created_at: string;
 }
 

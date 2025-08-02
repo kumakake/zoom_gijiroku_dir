@@ -179,7 +179,7 @@ const ManualTranscriptPage = () => {
 			const submitData = {
 				meeting_id: formData.meeting_id.trim(),
 				meeting_topic: formData.meeting_topic.trim() || 'ミーティング',
-				host_email: formData.host_email.trim() || user?.email,
+				host_email: formData.host_email.trim() || user?.email || '',
 				start_time: formData.start_time || new Date().toISOString()
 			};
 			

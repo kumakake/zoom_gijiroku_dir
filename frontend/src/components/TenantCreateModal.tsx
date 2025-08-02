@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { tenantApi } from '../lib/api';
 import { TenantFormData } from '../types/tenant';
-import { Button } from './ui/Button';
 import { toast } from 'react-hot-toast';
 
 interface TenantCreateModalProps {
@@ -160,8 +159,8 @@ export const TenantCreateModal: React.FC<TenantCreateModalProps> = ({
 							borderRadius: '0.25rem',
 							transition: 'background-color 0.2s'
 						}}
-						onMouseOver={(e) => e.target.style.backgroundColor = '#f3f4f6'}
-						onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
+						onMouseOver={(e) => (e.target as HTMLElement).style.backgroundColor = '#f3f4f6'}
+						onMouseOut={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
 					>
 						<X className="w-6 h-6" />
 					</button>
@@ -283,13 +282,13 @@ export const TenantCreateModal: React.FC<TenantCreateModalProps> = ({
 							}}
 							onMouseOver={(e) => {
 								if (!loading) {
-									e.target.style.backgroundColor = '#f9fafb';
-									e.target.style.borderColor = '#9ca3af';
+									(e.target as HTMLElement).style.backgroundColor = '#f9fafb';
+									(e.target as HTMLElement).style.borderColor = '#9ca3af';
 								}
 							}}
 							onMouseOut={(e) => {
-								e.target.style.backgroundColor = 'white';
-								e.target.style.borderColor = '#d1d5db';
+								(e.target as HTMLElement).style.backgroundColor = 'white';
+								(e.target as HTMLElement).style.borderColor = '#d1d5db';
 							}}
 						>
 							キャンセル

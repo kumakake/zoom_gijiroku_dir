@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Users, Settings, Trash2, Edit } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { tenantApi } from '../lib/api';
 import { Tenant, TenantListResponse, TenantSearchParams } from '../types/tenant';
-import { Button } from '../components/ui/Button';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { TenantCreateModal } from '../components/TenantCreateModal';
 import { TenantEditModal } from '../components/TenantEditModal';
 import { toast } from 'react-hot-toast';
+import { Plus, Search, Edit, Trash2, Users } from 'lucide-react';
 
 export const TenantsPage: React.FC = () => {
-	const { user, logout } = useAuth();
+	const { logout } = useAuth();
 	const [tenants, setTenants] = useState<Tenant[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [searchQuery, setSearchQuery] = useState('');
@@ -424,11 +423,11 @@ export const TenantsPage: React.FC = () => {
 										}}
 										onMouseOver={(e) => {
 											if (currentPage !== 1) {
-												e.target.style.backgroundColor = '#f3f4f6';
+												(e.target as HTMLElement).style.backgroundColor = '#f3f4f6';
 											}
 										}}
 										onMouseOut={(e) => {
-											e.target.style.backgroundColor = 'white';
+											(e.target as HTMLElement).style.backgroundColor = 'white';
 										}}
 									>
 										&lt;&lt;
@@ -450,11 +449,11 @@ export const TenantsPage: React.FC = () => {
 										}}
 										onMouseOver={(e) => {
 											if (currentPage !== 1) {
-												e.target.style.backgroundColor = '#f3f4f6';
+												(e.target as HTMLElement).style.backgroundColor = '#f3f4f6';
 											}
 										}}
 										onMouseOut={(e) => {
-											e.target.style.backgroundColor = 'white';
+											(e.target as HTMLElement).style.backgroundColor = 'white';
 										}}
 									>
 										&lt;
@@ -488,12 +487,12 @@ export const TenantsPage: React.FC = () => {
 												}}
 												onMouseOver={(e) => {
 													if (page !== currentPage) {
-														e.target.style.backgroundColor = '#f3f4f6';
+														(e.target as HTMLElement).style.backgroundColor = '#f3f4f6';
 													}
 												}}
 												onMouseOut={(e) => {
 													if (page !== currentPage) {
-														e.target.style.backgroundColor = 'white';
+														(e.target as HTMLElement).style.backgroundColor = 'white';
 													}
 												}}
 											>
@@ -518,11 +517,11 @@ export const TenantsPage: React.FC = () => {
 										}}
 										onMouseOver={(e) => {
 											if (currentPage !== totalPages) {
-												e.target.style.backgroundColor = '#f3f4f6';
+												(e.target as HTMLElement).style.backgroundColor = '#f3f4f6';
 											}
 										}}
 										onMouseOut={(e) => {
-											e.target.style.backgroundColor = 'white';
+											(e.target as HTMLElement).style.backgroundColor = 'white';
 										}}
 									>
 										&gt;
@@ -544,11 +543,11 @@ export const TenantsPage: React.FC = () => {
 										}}
 										onMouseOver={(e) => {
 											if (currentPage !== totalPages) {
-												e.target.style.backgroundColor = '#f3f4f6';
+												(e.target as HTMLElement).style.backgroundColor = '#f3f4f6';
 											}
 										}}
 										onMouseOut={(e) => {
-											e.target.style.backgroundColor = 'white';
+											(e.target as HTMLElement).style.backgroundColor = 'white';
 										}}
 									>
 										&gt;&gt;

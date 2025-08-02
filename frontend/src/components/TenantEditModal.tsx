@@ -227,8 +227,8 @@ export const TenantEditModal: React.FC<TenantEditModalProps> = ({
 							borderRadius: '0.25rem',
 							transition: 'background-color 0.2s'
 						}}
-						onMouseOver={(e) => e.target.style.backgroundColor = '#f3f4f6'}
-						onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
+						onMouseOver={(e) => (e.target as HTMLElement).style.backgroundColor = '#f3f4f6'}
+						onMouseOut={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
 					>
 						<X className="w-6 h-6" />
 					</button>
@@ -525,7 +525,7 @@ export const TenantEditModal: React.FC<TenantEditModalProps> = ({
 										/>
 										<button
 											type="button"
-											onClick={() => setShowSecrets(prev => ({...prev, api_key: !prev.api_key}))}
+											onClick={() => setShowSecrets(prev => ({...prev, client_id: !prev.client_id}))}
 											style={{
 												position: 'absolute',
 												right: '0.75rem',
@@ -568,7 +568,7 @@ export const TenantEditModal: React.FC<TenantEditModalProps> = ({
 										/>
 										<button
 											type="button"
-											onClick={() => setShowSecrets(prev => ({...prev, api_secret: !prev.api_secret}))}
+											onClick={() => setShowSecrets(prev => ({...prev, client_secret: !prev.client_secret}))}
 											style={{
 												position: 'absolute',
 												right: '0.75rem',
@@ -675,13 +675,13 @@ export const TenantEditModal: React.FC<TenantEditModalProps> = ({
 							}}
 							onMouseOver={(e) => {
 								if (!loading) {
-									e.target.style.backgroundColor = '#f9fafb';
-									e.target.style.borderColor = '#9ca3af';
+									(e.target as HTMLElement).style.backgroundColor = '#f9fafb';
+									(e.target as HTMLElement).style.borderColor = '#9ca3af';
 								}
 							}}
 							onMouseOut={(e) => {
-								e.target.style.backgroundColor = 'white';
-								e.target.style.borderColor = '#d1d5db';
+								(e.target as HTMLElement).style.backgroundColor = 'white';
+								(e.target as HTMLElement).style.borderColor = '#d1d5db';
 							}}
 						>
 							キャンセル
@@ -707,12 +707,12 @@ export const TenantEditModal: React.FC<TenantEditModalProps> = ({
 							}}
 							onMouseOver={(e) => {
 								if (!loading) {
-									e.target.style.backgroundColor = '#d97706';
+									(e.target as HTMLElement).style.backgroundColor = '#d97706';
 								}
 							}}
 							onMouseOut={(e) => {
 								if (!loading) {
-									e.target.style.backgroundColor = '#f59e0b';
+									(e.target as HTMLElement).style.backgroundColor = '#f59e0b';
 								}
 							}}
 						>

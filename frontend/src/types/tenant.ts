@@ -35,9 +35,15 @@ export interface ZoomSettings {
 	is_active: boolean;
 	created_at: string;
 	updated_at: string;
-	client_id_status: 'configured' | 'not_configured';
-	client_secret_status: 'configured' | 'not_configured';
-	webhook_secret_status: 'configured' | 'not_configured';
+	client_id: boolean;
+	client_secret: boolean;
+	webhook_secret: boolean;
+	// 下位互換性のための旧フィールド（廃止予定）
+	api_key_status?: 'configured' | 'not_configured';
+	api_secret_status?: 'configured' | 'not_configured';
+	client_id_status?: 'configured' | 'not_configured';
+	client_secret_status?: 'configured' | 'not_configured';
+	webhook_secret_status?: 'configured' | 'not_configured';
 }
 
 export interface TenantListResponse {
