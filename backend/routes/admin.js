@@ -178,7 +178,7 @@ router.post('/tenants', async (req, res) => {
 		// Zoom設定テーブルにデフォルトレコード作成
 		await query(`
 			INSERT INTO zoom_tenant_settings (tenant_id, zoom_client_id, is_active, created_at, updated_at)
-			VALUES ($1, '', false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+			VALUES ($1, '', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 		`, [tenantId]);
 
 		console.log(`Zoom設定レコード作成成功: テナント ${tenantId}`);
