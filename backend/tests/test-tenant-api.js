@@ -93,6 +93,18 @@ async function testTenantAPI() {
 			
 			const newTenantId = createResponse.data.tenant.tenant_id;
 			
+			// zoom_tenant_settings レコード作成確認
+			try {
+				const zoomSettingsResponse = await axios.get(`${BASE_URL}/admin/tenants/${newTenantId}/zoom-settings`, {
+					headers: {
+						'Authorization': `Bearer ${adminToken}`
+					}
+				});
+				console.log('✅ Zoom設定レコード作成確認:', zoomSettingsResponse.data ? '成功' : '失敗');
+			} catch (zoomError) {
+				console.log('❌ Zoom設定レコード確認失敗:', zoomError.response?.data?.error || zoomError.message);
+			}
+			
 			// 新規テナントでのAPIアクセステスト
 			console.log('\n5. 新規テナントAPIアクセステスト');
 			const newTenantToken = generateTestToken('75960513-56ef-4785-9de1-887ff4e39e73', newTenantId, 'tenant_admin');

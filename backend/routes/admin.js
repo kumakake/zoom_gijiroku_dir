@@ -172,11 +172,20 @@ router.post('/tenants', async (req, res) => {
 			admin_email
 		});
 
+		// データベースクエリ関数を取得
+		const { query } = require('../utils/database');
+
+		// Zoom設定テーブルにデフォルトレコード作成
+		await query(`
+			INSERT INTO zoom_tenant_settings (tenant_id, zoom_client_id, is_active, created_at, updated_at)
+			VALUES ($1, '', false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		`, [tenantId]);
+
+		console.log(`Zoom設定レコード作成成功: テナント ${tenantId}`);
+
 		// テナント管理者ユーザーを自動作成（既存ユーザーがいる場合は新しいテナントの管理者として追加）
 		const defaultPassword = 'TenantAdmin123!';
 		const hashedPassword = await bcrypt.hash(defaultPassword, 12);
-		
-		const { query } = require('../utils/database');
 		try {
 			// 既存ユーザーが存在するかチェック
 			const existingUser = await query('SELECT id, name FROM users WHERE email = $1', [admin_email]);
