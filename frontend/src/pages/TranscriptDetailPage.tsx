@@ -5,6 +5,7 @@ import { transcriptApi } from '../lib/api';
 import { toast } from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import DistributionHistoryModal from '../components/DistributionHistoryModal';
 
 interface ActionItem {
   id?: string;
@@ -15,19 +16,10 @@ interface ActionItem {
   completed?: boolean;
 }
 
-interface DistributionHistory {
-  log_uuid: string;
-  recipient_type: string;
-  recipient_id: string;
-  display_recipient: string;
-  status: string;
-  sent_at: string | null;
-  error_message: string | null;
-  created_at: string;
-}
 
 interface TranscriptDetail {
   transcript_uuid: string;
+  tenant_id: string;
   zoom_meeting_id: string;
   meeting_topic: string;
   start_time: string;
@@ -55,8 +47,6 @@ const TranscriptDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [showDistributionHistory, setShowDistributionHistory] = useState(false);
-  const [distributionHistory, setDistributionHistory] = useState<DistributionHistory[]>([]);
-  const [distributionLoading, setDistributionLoading] = useState(false);
   const [editData, setEditData] = useState({
     formatted_transcript: '',
     summary: '',
@@ -87,29 +77,6 @@ const TranscriptDetailPage = () => {
     }
   };
   
-  // 配布履歴取得
-  const loadDistributionHistory = async () => {
-    if (!id) return;
-    
-    try {
-      setDistributionLoading(true);
-      const response = await transcriptApi.getDistributionHistory(id);
-      setDistributionHistory(response.distribution_history || []);
-    } catch (error) {
-      console.error('配布履歴の取得に失敗:', error);
-      toast.error('配布履歴の取得に失敗しました');
-    } finally {
-      setDistributionLoading(false);
-    }
-  };
-  
-  // 配布履歴表示の切り替え
-  const toggleDistributionHistory = () => {
-    if (!showDistributionHistory) {
-      loadDistributionHistory();
-    }
-    setShowDistributionHistory(!showDistributionHistory);
-  };
   
   // 初期データ読み込み
   useEffect(() => {
@@ -175,7 +142,16 @@ const TranscriptDetailPage = () => {
   
   // 権限チェック
   const canEdit = () => {
-    return user?.role === 'admin' || transcript?.created_by_uuid === user?.id;
+    // システム管理者は全て編集可能
+    if (user?.role === 'admin') return true;
+    
+    // テナント管理者は自分のテナントの議事録を編集可能
+    if (user?.role === 'tenant_admin' && transcript?.tenant_id === user?.tenant_id) return true;
+    
+    // 作成者は自分の議事録を編集可能
+    if (transcript?.created_by_uuid === user?.id) return true;
+    
+    return false;
   };
   
   // 時間フォーマット
@@ -289,13 +265,9 @@ const TranscriptDetailPage = () => {
                       ✏️ 編集
                     </button>
                     <button
-                      onClick={toggleDistributionHistory}
+                      onClick={() => setShowDistributionHistory(true)}
                       className="profile-form-button"
-                      style={{ 
-                        minWidth: 'auto', 
-                        padding: '0.5rem 1rem',
-                        backgroundColor: showDistributionHistory ? '#059669' : '#0f766e'
-                      }}
+                      style={{ minWidth: 'auto', padding: '0.5rem 1rem' }}
                     >
                       📧 配布履歴
                     </button>
@@ -623,93 +595,6 @@ const TranscriptDetailPage = () => {
           </div>
         </div>
 
-        {/* 配布履歴セクション */}
-        {showDistributionHistory && (
-          <div style={{
-            marginTop: '2rem',
-            padding: '1.5rem',
-            backgroundColor: '#f8fafc',
-            borderRadius: '0.5rem',
-            border: '1px solid #e2e8f0'
-          }}>
-            <h3 style={{
-              fontSize: '1.125rem',
-              fontWeight: '600',
-              marginBottom: '1rem',
-              color: '#1e293b'
-            }}>
-              📧 メール配布履歴
-            </h3>
-            
-            {distributionLoading ? (
-              <div style={{ textAlign: 'center', padding: '1rem' }}>
-                <LoadingSpinner />
-                <p style={{ marginTop: '0.5rem', color: '#64748b' }}>配布履歴を読み込み中...</p>
-              </div>
-            ) : distributionHistory.length === 0 ? (
-              <p style={{ color: '#64748b', fontStyle: 'italic' }}>
-                配布履歴がありません
-              </p>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  fontSize: '0.875rem'
-                }}>
-                  <thead>
-                    <tr style={{ backgroundColor: '#e2e8f0' }}>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #cbd5e1' }}>配布先</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #cbd5e1' }}>種別</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #cbd5e1' }}>ステータス</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #cbd5e1' }}>送信日時</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '1px solid #cbd5e1' }}>エラー</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {distributionHistory.map((log) => (
-                      <tr key={log.log_uuid} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                        <td style={{ padding: '0.75rem' }}>{log.display_recipient}</td>
-                        <td style={{ padding: '0.75rem' }}>
-                          <span style={{
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '0.25rem',
-                            fontSize: '0.75rem',
-                            backgroundColor: log.recipient_type === 'email' ? '#dbeafe' : '#fef3c7',
-                            color: log.recipient_type === 'email' ? '#1e40af' : '#92400e'
-                          }}>
-                            {log.recipient_type === 'email' ? 'メール' : log.recipient_type}
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.75rem' }}>
-                          <span style={{
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '0.25rem',
-                            fontSize: '0.75rem',
-                            backgroundColor: log.status === 'sent' ? '#dcfce7' : 
-                                           log.status === 'failed' ? '#fecaca' : '#fef3c7',
-                            color: log.status === 'sent' ? '#166534' : 
-                                   log.status === 'failed' ? '#dc2626' : '#92400e'
-                          }}>
-                            {log.status === 'sent' ? '送信済み' : 
-                             log.status === 'failed' ? '失敗' : 
-                             log.status === 'pending' ? '待機中' : log.status}
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.75rem' }}>
-                          {log.sent_at ? new Date(log.sent_at).toLocaleString('ja-JP') : '-'}
-                        </td>
-                        <td style={{ padding: '0.75rem', color: '#dc2626', fontSize: '0.75rem' }}>
-                          {log.error_message || '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* 作成情報 */}
         <div style={{ 
@@ -727,6 +612,13 @@ const TranscriptDetailPage = () => {
             <> • 👤 作成者: {transcript.created_by_name}</>
           )}
         </div>
+
+        {/* 配布履歴モーダル */}
+        <DistributionHistoryModal
+          isOpen={showDistributionHistory}
+          onClose={() => setShowDistributionHistory(false)}
+          transcriptId={id || ''}
+        />
       </main>
     </div>
   );

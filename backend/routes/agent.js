@@ -43,10 +43,19 @@ router.get('/jobs', authenticateToken, async (req, res) => {
 			params.push(type);
 		}
 		
-		// 管理者以外は自分が作成したジョブのみ表示
-		if (req.user.role !== 'admin') {
+		// テナント制限と権限制限
+		if (req.user.role === 'admin') {
+			// システム管理者は全テナントのデータにアクセス可能
+		} else if (req.user.role === 'tenant_admin') {
+			// テナント管理者は自テナントのデータのみ
+			conditions.push(`aj.tenant_id = $${params.length + 1}`);
+			params.push(req.user.tenant_id);
+		} else {
+			// 一般ユーザーは自分が作成したジョブのみ
 			conditions.push(`aj.created_by_uuid = $${params.length + 1}`);
 			params.push(req.user.user_uuid);
+			conditions.push(`aj.tenant_id = $${params.length + 1}`);
+			params.push(req.user.tenant_id);
 		}
 		
 		if (conditions.length > 0) {
@@ -64,8 +73,10 @@ router.get('/jobs', authenticateToken, async (req, res) => {
 		
 	} catch (error) {
 		console.error('エージェントジョブ一覧取得エラー:', error);
+		console.error('ユーザー情報:', req.user);
 		res.status(500).json({
-			error: 'エージェントジョブ一覧取得中にエラーが発生しました'
+			error: 'エージェントジョブ一覧取得中にエラーが発生しました',
+			details: error.message
 		});
 	}
 });
@@ -195,10 +206,17 @@ router.get('/stats', authenticateToken, async (req, res) => {
 		const params = [];
 		let whereClause = '';
 		
-		// 管理者以外は自分が作成したジョブのみ
-		if (req.user.role !== 'admin') {
-			whereClause = ' WHERE created_by_uuid = $1';
-			params.push(req.user.user_uuid);
+		// テナント制限と権限制限
+		if (req.user.role === 'admin') {
+			// システム管理者は全テナントのデータにアクセス可能
+		} else if (req.user.role === 'tenant_admin') {
+			// テナント管理者は自テナントのデータのみ
+			whereClause = ' WHERE tenant_id = $1';
+			params.push(req.user.tenant_id);
+		} else {
+			// 一般ユーザーは自分が作成したジョブのみ
+			whereClause = ' WHERE created_by_uuid = $1 AND tenant_id = $2';
+			params.push(req.user.user_uuid, req.user.tenant_id);
 		}
 		
 		const result = await query(statsQuery + whereClause, params);

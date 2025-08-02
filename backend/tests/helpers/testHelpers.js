@@ -5,7 +5,7 @@
 
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
-const db = require('../../config/database');
+const { query: dbQuery } = require('../../utils/database');
 
 /**
  * テストユーザーを作成
@@ -28,7 +28,7 @@ async function createTestUser(userInfo) {
 		RETURNING *
 	`;
 
-	const result = await db.query(query, [
+	const result = await dbQuery(query, [
 		userUuid,
 		email,
 		hashedPassword,
@@ -57,7 +57,7 @@ async function createTestTenant(tenantInfo) {
 		RETURNING *
 	`;
 
-	const result = await db.query(query, [
+	const result = await dbQuery(query, [
 		tenant_id,
 		name,
 		admin_email,
@@ -92,7 +92,7 @@ async function createTestTranscript(transcriptInfo) {
 		RETURNING *
 	`;
 
-	const result = await db.query(query, [
+	const result = await dbQuery(query, [
 		tenant_id,
 		created_by_uuid,
 		title,
@@ -128,7 +128,7 @@ async function createTestJob(jobInfo) {
 		RETURNING *
 	`;
 
-	const result = await db.query(query, [
+	const result = await dbQuery(query, [
 		tenant_id,
 		created_by_uuid,
 		type,
@@ -145,12 +145,28 @@ async function createTestJob(jobInfo) {
 async function cleanupTestData() {
 	try {
 		// 外部キー制約のため、順序を考慮して削除
-		await db.query("DELETE FROM distribution_logs WHERE tenant_id LIKE 'test_%' OR tenant_id IN ('a7b2c9f1', 'b8c3d0e2')");
-		await db.query("DELETE FROM meeting_transcripts WHERE tenant_id LIKE 'test_%' OR tenant_id IN ('a7b2c9f1', 'b8c3d0e2')");
-		await db.query("DELETE FROM agent_jobs WHERE tenant_id LIKE 'test_%' OR tenant_id IN ('a7b2c9f1', 'b8c3d0e2')");
-		await db.query("DELETE FROM users WHERE tenant_id LIKE 'test_%' OR tenant_id IN ('a7b2c9f1', 'b8c3d0e2', 'system')");
-		await db.query("DELETE FROM zoom_tenant_settings WHERE tenant_id LIKE 'test_%' OR tenant_id IN ('a7b2c9f1', 'b8c3d0e2')");
-		await db.query("DELETE FROM tenants WHERE tenant_id LIKE 'test_%' OR tenant_id IN ('a7b2c9f1', 'b8c3d0e2')");
+		// 安全な方法：テスト専用プレフィックスと明確に特定できるテストIDのみ削除
+		const testTenantIds = "('test_tenant_1', 'test_tenant_2', 'a7b2c9f1', 'b8c3d0e2')";
+		
+		console.log('テストデータクリーンアップ開始...');
+		
+		// より包括的なクリーンアップ
+		await dbQuery(`DELETE FROM distribution_logs WHERE tenant_id LIKE 'test_%' OR tenant_id IN ${testTenantIds}`);
+		await dbQuery(`DELETE FROM meeting_transcripts WHERE tenant_id LIKE 'test_%' OR tenant_id IN ${testTenantIds}`);
+		await dbQuery(`DELETE FROM agent_jobs WHERE tenant_id LIKE 'test_%' OR tenant_id IN ${testTenantIds}`);
+		
+		// テスト用ユーザーの削除（より広範囲）
+		await dbQuery(`
+			DELETE FROM users 
+			WHERE email LIKE '%test.com' 
+			OR tenant_id IN ${testTenantIds}
+			OR email IN ('tenant1.admin@test.com', 'tenant2.admin@test.com', 'user1@test.com', 'user2@test.com')
+		`);
+		
+		await dbQuery(`DELETE FROM zoom_tenant_settings WHERE tenant_id LIKE 'test_%' OR tenant_id IN ${testTenantIds}`);
+		await dbQuery(`DELETE FROM tenants WHERE tenant_id LIKE 'test_%' OR tenant_id IN ${testTenantIds}`);
+		
+		console.log('テストデータクリーンアップ完了');
 	} catch (error) {
 		console.error('テストデータクリーンアップエラー:', error);
 	}
@@ -181,7 +197,7 @@ async function createTestZoomSettings(settingsInfo) {
 		RETURNING *
 	`;
 
-	const result = await db.query(query, [
+	const result = await dbQuery(query, [
 		tenant_id,
 		zoom_api_key,
 		zoom_api_secret,

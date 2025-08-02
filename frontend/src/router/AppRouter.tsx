@@ -122,16 +122,21 @@ export const AppRouter = () => {
           <TranscriptDetailPage />
         </ProtectedRoute>
       } />
-      <Route path="/jobs" element={
-        <ProtectedRoute>
-          <JobsPage />
-        </ProtectedRoute>
-      } />
-      <Route path="/jobs/:id" element={
-        <ProtectedRoute>
-          <JobDetailPage />
-        </ProtectedRoute>
-      } />
+      {/* Jobs routes - 開発環境でのみ有効 */}
+      {import.meta.env.VITE_SHOW_JOB_STATUS === 'true' && (
+        <>
+          <Route path="/jobs" element={
+            <ProtectedRoute>
+              <JobsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/jobs/:id" element={
+            <ProtectedRoute>
+              <JobDetailPage />
+            </ProtectedRoute>
+          } />
+        </>
+      )}
       <Route path="/settings" element={
         <ProtectedRoute>
           <SettingsPage />

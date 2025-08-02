@@ -103,7 +103,8 @@ const requireAdmin = (req, res, next) => {
 	
 	if (req.user.role !== 'admin') {
 		return res.status(403).json({
-			error: '管理者権限が必要です'
+			error: '管理者権限が必要です',
+			code: 'INSUFFICIENT_PERMISSIONS'
 		});
 	}
 	

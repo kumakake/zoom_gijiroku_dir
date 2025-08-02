@@ -10,15 +10,21 @@
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const { createTestApp } = require('./helpers/testApp');
-const { createTestUser, cleanupTestData } = require('./helpers/testHelpers');
+const { createTestUser, createTestTenant, cleanupTestData, generateTestTenantId } = require('./helpers/testHelpers');
 
 describe('テナント管理者認証テスト', () => {
 	let app;
-	let testTenantId = 'a7b2c9f1';
+	let testTenantId = generateTestTenantId();
 	let adminUser, tenantAdminUser, regularUser;
 
 	beforeAll(async () => {
+		// テスト開始前にクリーンアップ
+		await cleanupTestData();
+		
 		app = await createTestApp();
+		
+		// テストテナント作成
+		await createTestTenant({ tenant_id: testTenantId, name: 'テストテナント' });
 		
 		// テストユーザー作成
 		adminUser = await createTestUser({

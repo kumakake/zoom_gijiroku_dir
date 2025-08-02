@@ -9,24 +9,35 @@
 
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
-const { createTestApp } = require('./helpers/testApp');
+const { createRealTestApp } = require('./helpers/realTestApp');
 const { 
 	createTestUser, 
 	createTestTenant, 
 	createTestTranscript,
 	createTestJob,
-	cleanupTestData 
+	cleanupTestData,
+	generateTestTenantId 
 } = require('./helpers/testHelpers');
 
 describe('テナントデータ分離テスト', () => {
 	let app;
-	let tenant1Id = 'a7b2c9f1';
-	let tenant2Id = 'b8c3d0e2';
+	let tenant1Id = generateTestTenantId();
+	let tenant2Id = generateTestTenantId();
 	let tenantAdmin1, tenantAdmin2, user1, user2;
 	let transcript1, transcript2, job1, job2;
+	
+	// ランダムなメールアドレスを生成してテスト間の競合を回避
+	const randomSuffix = Math.random().toString(36).substring(2, 8);
+	const tenant1AdminEmail = `tenant1.admin.${randomSuffix}@test.com`;
+	const tenant2AdminEmail = `tenant2.admin.${randomSuffix}@test.com`;
+	const user1Email = `user1.${randomSuffix}@test.com`;
+	const user2Email = `user2.${randomSuffix}@test.com`;
 
 	beforeAll(async () => {
-		app = await createTestApp();
+		// テスト開始前にクリーンアップ
+		await cleanupTestData();
+		
+		app = await createRealTestApp();
 		
 		// テストテナント作成
 		await createTestTenant({ tenant_id: tenant1Id, name: 'テナント1' });
@@ -34,27 +45,36 @@ describe('テナントデータ分離テスト', () => {
 		
 		// テストユーザー作成
 		tenantAdmin1 = await createTestUser({
-			email: 'tenant1.admin@test.com',
+			email: tenant1AdminEmail,
 			role: 'tenant_admin',
 			tenant_id: tenant1Id
 		});
 		
 		user1 = await createTestUser({
-			email: 'user1@test.com',
+			email: user1Email,
 			role: 'user',
 			tenant_id: tenant1Id
 		});
 		
 		tenantAdmin2 = await createTestUser({
-			email: 'tenant2.admin@test.com',
+			email: tenant2AdminEmail,
 			role: 'tenant_admin',
 			tenant_id: tenant2Id
 		});
 		
 		user2 = await createTestUser({
-			email: 'user2@test.com',
+			email: user2Email,
 			role: 'user',
 			tenant_id: tenant2Id
+		});
+		
+		// ユーザー作成完了後にテストデータを作成
+		// wait to ensure users are created properly
+		console.log('Created users:', { 
+			user1: user1?.user_uuid, 
+			user2: user2?.user_uuid,
+			tenantAdmin1: tenantAdmin1?.user_uuid,
+			tenantAdmin2: tenantAdmin2?.user_uuid
 		});
 		
 		// テストデータ作成
@@ -124,6 +144,10 @@ describe('テナントデータ分離テスト', () => {
 			.get(`/${tenant1Id}/api/agent/jobs`)
 			.set('Authorization', `Bearer ${token}`);
 
+		if (response.status !== 200) {
+			console.log('Jobs API error:', response.status, JSON.stringify(response.body, null, 2));
+			process.stdout.write(`Jobs API error: ${response.status} ${JSON.stringify(response.body)}\n`);
+		}
 		expect(response.status).toBe(200);
 		expect(Array.isArray(response.body.jobs)).toBe(true);
 		
@@ -145,6 +169,10 @@ describe('テナントデータ分離テスト', () => {
 			.get(`/${tenant1Id}/api/transcripts/${transcript2.id}`)
 			.set('Authorization', `Bearer ${token}`);
 
+		if (response.status !== 404) {
+			console.log('Direct access error:', response.status, JSON.stringify(response.body, null, 2));
+			process.stdout.write(`Direct access error: ${response.status} ${JSON.stringify(response.body)}\n`);
+		}
 		expect(response.status).toBe(404);
 		expect(response.body.error).toMatch(/議事録が見つかりません|Not found/);
 	});

@@ -63,14 +63,15 @@ const DashboardPage = () => {
       link: '/transcripts',
       buttonText: '議事録を見る'
     },
-    {
+    // ジョブ状況は開発環境でのみ表示
+    ...(import.meta.env.VITE_SHOW_JOB_STATUS === 'true' ? [{
       title: 'ジョブ状況',
       description: '処理中のタスクを監視',
       icon: '⚙️',
       color: 'green',
       link: '/jobs',
       buttonText: 'ジョブを見る'
-    },
+    }] : []),
     {
       title: 'ファイルアップロード',
       description: '音声ファイルの手動アップロード',
@@ -188,30 +189,32 @@ const DashboardPage = () => {
           ))}
         </div>
 
-        {/* Stats Section */}
-        <div className="dashboard-stats">
-          <h3 className="dashboard-stats-title">システム状況</h3>
-          <div className="dashboard-stats-grid">
-            <div className="dashboard-stat-card blue">
-              <div className="dashboard-stat-value blue">
-                {stats.loading ? '...' : stats.transcriptCount}
+        {/* Stats Section - 開発環境でのみ表示 */}
+        {import.meta.env.VITE_SHOW_SYSTEM_STATUS === 'true' && (
+          <div className="dashboard-stats">
+            <h3 className="dashboard-stats-title">システム状況</h3>
+            <div className="dashboard-stats-grid">
+              <div className="dashboard-stat-card blue">
+                <div className="dashboard-stat-value blue">
+                  {stats.loading ? '...' : stats.transcriptCount}
+                </div>
+                <div className="dashboard-stat-label">処理済み議事録</div>
               </div>
-              <div className="dashboard-stat-label">処理済み議事録</div>
-            </div>
-            <div className="dashboard-stat-card green">
-              <div className="dashboard-stat-value green">
-                {stats.loading ? '...' : stats.activeJobs}
+              <div className="dashboard-stat-card green">
+                <div className="dashboard-stat-value green">
+                  {stats.loading ? '...' : stats.activeJobs}
+                </div>
+                <div className="dashboard-stat-label">実行中ジョブ</div>
               </div>
-              <div className="dashboard-stat-label">実行中ジョブ</div>
-            </div>
-            <div className="dashboard-stat-card purple">
-              <div className="dashboard-stat-value purple">
-                {stats.loading ? '...' : stats.distributedEmails}
+              <div className="dashboard-stat-card purple">
+                <div className="dashboard-stat-value purple">
+                  {stats.loading ? '...' : stats.distributedEmails}
+                </div>
+                <div className="dashboard-stat-label">配布済みメール</div>
               </div>
-              <div className="dashboard-stat-label">配布済みメール</div>
             </div>
           </div>
-        </div>
+        )}
       </main>
     </div>
   );

@@ -60,6 +60,9 @@ describe('メール配布品質テスト - デグレード防止', () => {
 		// updateDistributionLogメソッドをモック
 		emailWorker.updateDistributionLog = jest.fn();
 		
+		// 既に送信済みチェック用のモック
+		emailWorker.getDistributionLogsByTranscriptId = jest.fn().mockResolvedValue([]);
+		
 		// emailServiceのモック
 		emailWorker.emailService = {
 			sendTranscriptEmail: jest.fn().mockResolvedValue({
@@ -72,15 +75,15 @@ describe('メール配布品質テスト - デグレード防止', () => {
 		
 		// 重要: HOST用の配布ログが作成されること
 		expect(emailWorker.createDistributionLog).toHaveBeenCalledWith(
-			jobData.transcript_id, 'email', 'host@example.com', 'pending'
+			jobData.transcript_id, 'host@example.com', 'pending', undefined
 		);
 		
 		// 重要: BCC受信者用の配布ログが作成されること
 		expect(emailWorker.createDistributionLog).toHaveBeenCalledWith(
-			jobData.transcript_id, 'email', 'participant1@example.com', 'pending'
+			jobData.transcript_id, 'participant1@example.com', 'pending', undefined
 		);
 		expect(emailWorker.createDistributionLog).toHaveBeenCalledWith(
-			jobData.transcript_id, 'email', 'participant2@example.com', 'pending'
+			jobData.transcript_id, 'participant2@example.com', 'pending', undefined
 		);
 		
 		// デグレード防止: 配布ログが欠けていないこと
@@ -101,6 +104,7 @@ describe('メール配布品質テスト - デグレード防止', () => {
 		
 		emailWorker.createDistributionLog = jest.fn().mockResolvedValue(1);
 		emailWorker.updateDistributionLog = jest.fn();
+		emailWorker.getDistributionLogsByTranscriptId = jest.fn().mockResolvedValue([]);
 		emailWorker.emailService = {
 			sendTranscriptEmail: jest.fn().mockResolvedValue({
 				success: true,
@@ -111,7 +115,7 @@ describe('メール配布品質テスト - デグレード防止', () => {
 		await emailWorker.processEmailSending(mockJob);
 		
 		// 重要: 成功時に配布ログが'sent'ステータスで更新されること
-		expect(emailWorker.updateDistributionLog).toHaveBeenCalledWith(1, 'sent', null, 'test-message-id');
+		expect(emailWorker.updateDistributionLog).toHaveBeenCalledWith(1, 'sent', null);
 	});
 
 	test('メール送信失敗時に配布ログがエラーステータスで更新されること', async () => {
@@ -128,9 +132,9 @@ describe('メール配布品質テスト - デグレード防止', () => {
 		
 		emailWorker.createDistributionLog = jest.fn().mockResolvedValue(1);
 		emailWorker.updateDistributionLog = jest.fn();
-		emailWorker.getDistributionLogsByTranscriptId = jest.fn().mockResolvedValue([
-			{ id: 1, status: 'pending' }
-		]);
+		emailWorker.getDistributionLogsByTranscriptId = jest.fn()
+			.mockResolvedValueOnce([]) // 既に送信済みチェック用（空で既送信ではないことを示す）
+			.mockResolvedValueOnce([{ id: 1, status: 'pending' }]); // エラー処理時の pending ログ取得用
 		emailWorker.emailService = {
 			sendTranscriptEmail: jest.fn().mockRejectedValue(new Error('SMTP Error'))
 		};

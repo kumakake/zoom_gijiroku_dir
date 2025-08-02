@@ -118,7 +118,7 @@ router.post('/login', [
 		
 		// ユーザー情報の取得
 		const userResult = await query(
-			'SELECT user_uuid, email, name, password_hash, role, is_active, created_at FROM users WHERE email = $1',
+			'SELECT user_uuid, email, name, password_hash, role, tenant_id, is_active, created_at FROM users WHERE email = $1',
 			[email]
 		);
 		
@@ -170,6 +170,7 @@ router.post('/login', [
 				email: user.email,
 				name: user.name,
 				role: user.role,
+				tenant_id: user.tenant_id,
 				createdAt: user.created_at
 			},
 			accessToken,

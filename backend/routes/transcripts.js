@@ -171,6 +171,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 			SELECT 
 				mt.*,
 				aj.created_by_uuid,
+				aj.tenant_id,
 				u.name as created_by_name,
 				u.email as created_by_email,
 				aj.data->>'host_email' as host_email,
@@ -242,19 +243,14 @@ router.get('/:id/distribution-history', authenticateToken, async (req, res) => {
 		// 配布履歴を取得
 		const distributionResult = await query(`
 			SELECT 
-				dl.distribution_log_uuid,
-				dl.recipient_type,
-				dl.recipient_id,
+				dl.log_uuid,
+				'email' as recipient_type,
+				dl.recipient_email as recipient_id,
 				dl.status,
 				dl.sent_at,
 				dl.error_message,
 				dl.created_at,
-				CASE 
-					WHEN dl.recipient_type = 'email' THEN dl.recipient_id
-					WHEN dl.recipient_type = 'workflow_api' THEN 'Workflow API'
-					WHEN dl.recipient_type = 'slack' THEN 'Slack'
-					ELSE dl.recipient_type
-				END as display_recipient
+				dl.recipient_email as display_recipient
 			FROM distribution_logs dl
 			WHERE dl.transcript_uuid = $1
 			ORDER BY dl.created_at DESC
@@ -264,7 +260,7 @@ router.get('/:id/distribution-history', authenticateToken, async (req, res) => {
 			success: true,
 			transcript_uuid: transcriptUuid,
 			distribution_history: distributionResult.rows.map(row => ({
-				log_uuid: row.distribution_log_uuid,
+				log_uuid: row.log_uuid,
 				recipient_type: row.recipient_type,
 				recipient_id: row.recipient_id,
 				display_recipient: row.display_recipient,
