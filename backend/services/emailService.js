@@ -15,6 +15,15 @@ class EmailService {
 			}
 		};
 
+		// 本番環境でlocalhost接続の場合、SSL証明書検証を無効化
+		if (process.env.NODE_ENV === 'production' && this.smtpConfig.host === 'localhost') {
+			this.smtpConfig.tls = {
+				rejectUnauthorized: false, // SSL証明書検証を無効化
+				servername: 'zm01.ast-tools.online' // 証明書のサーバー名を明示
+			};
+			console.log('⚠️ 本番環境localhost接続: SSL証明書検証を無効化');
+		}
+
 		// 開発環境用の設定
 		if (process.env.NODE_ENV === 'development') {
 			this.smtpConfig = {
