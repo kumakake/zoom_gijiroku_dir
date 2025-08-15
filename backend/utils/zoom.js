@@ -180,10 +180,10 @@ function parseVTTContent(vttContent) {
 				continue;
 			}
 			
-			// 発言者と内容の行を検出 (例: 61246  上辻としゆき: はい。こんばんは。)
+			// 発言者と内容の行を検出 (例: 61246  上辻としゆき: はい。こんばんは。 または 株式会社アステム: どうなんかんだ。)
 			if (line && !line.startsWith('WEBVTT') && !line.includes('-->') && line.includes(':')) {
-				// 発言者名を抽出 (数字ID + 名前: の部分)
-				const speakerMatch = line.match(/^\d+\s+([^:]+):\s*(.*)$/);
+				// 発言者名を抽出 (発言者名: 内容 の部分)
+				const speakerMatch = line.match(/^([^:]+):\s*(.*)$/);
 				if (speakerMatch) {
 					currentSpeaker = speakerMatch[1].trim();
 					currentText = speakerMatch[2].trim();
