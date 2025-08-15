@@ -364,6 +364,7 @@ class TranscriptWorker {
 						cost_savings: true
 					});
 					
+					console.log('🎯 VTT処理成功により文字起こし完了。Whisper APIはスキップします。');
 					return vttAnalysis.chronologicalTranscript;
 				} else {
 					console.warn('⚠️ VTT解析失敗。Whisper APIにフォールバック:', vttAnalysis.error);
@@ -377,7 +378,7 @@ class TranscriptWorker {
 				throw new Error('音声ファイルもVTTファイルも利用できません');
 			}
 			
-			console.log('🎙️ Whisper APIで文字起こしを実行します...');
+			console.log('⚠️ VTT処理が失敗または利用不可のため、Whisper APIで文字起こしを実行します...');
 			const whisperResult = await this.openaiService.transcribeZoomRecording(
 				recordingData.audioFile.download_url, 
 				recordingData.accessToken
