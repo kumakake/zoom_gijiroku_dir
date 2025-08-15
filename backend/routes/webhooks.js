@@ -366,14 +366,15 @@ const handleTranscriptCompleted = async (payload, tenantId) => {
 			return;
 		}
 		
-		// 重複処理防止チェック
+		// 重複処理防止チェック（同じ会議ID + 開始時刻の組み合わせ）
 		const duplicateCheck = await db.query(
 			`SELECT id, status, type FROM agent_jobs 
 			WHERE meeting_id = $1 AND tenant_id = $2 
+			AND data->>'start_time' = $3
 			AND type IN ('transcript_completed', 'recording_completed') 
 			AND status IN ('completed', 'processing')
 			ORDER BY created_at DESC LIMIT 1`,
-			[payload.object.id, tenantId]
+			[payload.object.id, tenantId, payload.object.start_time]
 		);
 		
 		if (duplicateCheck.rows.length > 0) {
