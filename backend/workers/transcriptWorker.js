@@ -648,7 +648,7 @@ class TranscriptWorker {
 			`;
 			const userResult = await this.db.query(userQuery, [hostEmail]);
 			
-			let distributionMode = 'host_only'; // デフォルトはホストのみ配信
+			let distributionMode = 'all_participants'; // デフォルトは全参加者に配信
 			let hostName = '';
 			
 			if (userResult.rows.length > 0) {
@@ -699,8 +699,17 @@ class TranscriptWorker {
 			// 全参加者配信の場合は参加者メールアドレスを取得
 			if (distributionMode === 'all_participants') {
 				try {
+					console.log(`🔍 全参加者配信モード: 会議ID=${meetingInfo.id || meetingInfo.zoom_meeting_id}でZoom参加者メール取得開始`);
 					const accessToken = await this.getZoomAccessToken(tenantId);
-					const participantData = await zoomUtils.getParticipantEmails(meetingInfo.id, accessToken);
+					const participantData = await zoomUtils.getParticipantEmails(meetingInfo.id || meetingInfo.zoom_meeting_id, accessToken);
+					
+					console.log(`🔍 Zoom参加者取得結果:`, {
+						success: participantData.success,
+						totalParticipants: participantData.totalParticipants || 0,
+						emailParticipants: participantData.emailParticipants || 0,
+						emailAddresses: participantData.emailAddresses || [],
+						error: participantData.error || null
+					});
 					
 					if (participantData.success && participantData.emailAddresses.length > 0) {
 						// ホストメールを除外して重複削除
@@ -708,12 +717,19 @@ class TranscriptWorker {
 							.filter(email => email !== hostEmail)
 							.filter((email, index, self) => self.indexOf(email) === index);
 						
-						console.log(`参加者メール取得成功: ${participantData.emailAddresses.length}名中${bccRecipients.length}名をBccに追加`);
+						console.log(`✅ 参加者メール取得成功: ${participantData.emailAddresses.length}名中${bccRecipients.length}名をBccに追加`);
+						console.log(`🔍 Bcc送信先一覧:`, bccRecipients);
 					} else {
-						console.log(`参加者メール取得失敗: ${participantData.error || '不明なエラー'}`);
+						console.log(`⚠️ 参加者メール取得失敗: ${participantData.error || '不明なエラー'}`);
+						console.log(`🔍 失敗詳細:`, participantData);
 					}
 				} catch (error) {
-					console.error('参加者メール取得エラー:', error);
+					console.error('❌ 参加者メール取得エラー:', error);
+					console.error('🔍 エラー詳細:', {
+						message: error.message,
+						status: error.response?.status,
+						data: error.response?.data
+					});
 				}
 			}
 
