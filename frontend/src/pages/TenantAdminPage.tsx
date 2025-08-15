@@ -353,6 +353,13 @@ export const TenantAdminPage: React.FC = () => {
             <div>
               <strong>作成日:</strong> {new Date(tenant.created_at).toLocaleDateString('ja-JP')}
             </div>
+            <div>
+              <strong>Webhook URL:</strong><br />
+			  <span>
+			    &ensp;https://zm01.ast-tools.online/api/webhooks<br />
+                &ensp;/zoom/{tenant.tenant_id}
+			  </span>
+            </div>
           </div>
         )}
         </div>
@@ -490,6 +497,35 @@ export const TenantAdminPage: React.FC = () => {
                   }}>
                     {zoomSettings.webhook_secret_status === 'configured' ? '設定済み' : '未設定'}
                   </span>
+                </div>
+
+                <div>
+                  <strong>■Zoom イベント</strong>
+                </div>
+                <div>
+                  <strong>Meeting:</strong><span>End Meeting</span>
+                </div>
+                <div>
+                  <strong>Recording:</strong><br />
+				  <span>&emsp;All Recordings have completed</span><br />
+				  <span>&emsp;Recording Transcript files have completed</span>
+                </div>
+
+                <div>
+                  <strong>■Zoom スコープ</strong>
+                </div>
+                <div>
+                  <strong>Meeting:</strong><br />
+				  <span>meeting:read:meeting:admin ( View a meeting ) </span>
+                </div>
+                <div>
+                  <strong>Recording:</strong><br />
+				  <span>cloud_recording:read:recording:admin<br />　( View a recording ) </span><br />
+				  <span>cloud_recording:read:list_recording_files:admin<br />　( Returns all of a meeting's recordings. )</span>
+                </div>
+                <div>
+                  <strong>Report:</strong><br />
+				  <span>report:read:list_meeting_participants:admin<br />　( View meeting participant reports )</span>
                 </div>
               </div>
             ) : (

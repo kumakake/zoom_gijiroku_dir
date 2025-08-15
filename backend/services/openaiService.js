@@ -203,25 +203,220 @@ class OpenAIService {
 		try {
 			console.log('Whisper APIで文字起こしを開始します...');
 
-			const transcription = await this.client.audio.transcriptions.create({
-				file: fs.createReadStream(filePath),
-				model: 'whisper-1',
-				language: 'ja', // 日本語指定
-				response_format: 'verbose_json', // 詳細情報とタイムスタンプを取得
-				temperature: 0.2, // 精度重視
-				timestamp_granularities: ['segment'], // セグメント単位のタイムスタンプ
-			});
+			// ファイルサイズをチェック
+			const fileStats = fs.statSync(filePath);
+			const fileSizeInBytes = fileStats.size;
+			const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB in bytes
 
-			console.log('文字起こしが完了しました');
-			
-			// タイムスタンプ付きセグメントデータを処理
-			const processedTranscript = this.processWhisperSegments(transcription);
-			
-			return processedTranscript;
+			console.log(`音声ファイルサイズ: ${Math.round(fileSizeInBytes / 1024 / 1024 * 100) / 100}MB`);
+
+			// 25MB以下の場合は既存処理
+			if (fileSizeInBytes <= MAX_FILE_SIZE) {
+				console.log('ファイルサイズが25MB以下のため、通常処理を実行します');
+				return await this.processNormalTranscription(filePath);
+			} else {
+				console.log('ファイルサイズが25MBを超過しているため、分割処理を実行します');
+				return await this.processLargeFileTranscription(filePath);
+			}
 
 		} catch (error) {
 			console.error('Whisper API呼び出しエラー:', error);
 			throw new Error(`Whisper APIエラー: ${error.message}`);
+		}
+	}
+
+	/**
+	 * 通常サイズファイルの文字起こし処理（既存処理）
+	 * @param {string} filePath - 音声ファイルのパス
+	 * @returns {Promise<Object>} 処理された文字起こしデータ
+	 */
+	async processNormalTranscription(filePath) {
+		const transcription = await this.client.audio.transcriptions.create({
+			file: fs.createReadStream(filePath),
+			model: 'whisper-1',
+			language: 'ja', // 日本語指定
+			response_format: 'verbose_json', // 詳細情報とタイムスタンプを取得
+			temperature: 0.2, // 精度重視
+			timestamp_granularities: ['segment'], // セグメント単位のタイムスタンプ
+		});
+
+		console.log('文字起こしが完了しました');
+		
+		// タイムスタンプ付きセグメントデータを処理
+		const processedTranscript = this.processWhisperSegments(transcription);
+		
+		return processedTranscript;
+	}
+
+	/**
+	 * 大容量ファイルの分割文字起こし処理
+	 * @param {string} filePath - 音声ファイルのパス
+	 * @returns {Promise<Object>} 統合された文字起こしデータ
+	 */
+	async processLargeFileTranscription(filePath) {
+		const path = require('path');
+		const { exec } = require('child_process');
+		const { promisify } = require('util');
+		const execAsync = promisify(exec);
+
+		const tempDir = path.dirname(filePath);
+		const baseName = path.basename(filePath, path.extname(filePath));
+		const splitFiles = [];
+		
+		try {
+			console.log('音声ファイルの分割を開始します...');
+			
+			// ファイル情報を取得（時長）
+			const duration = await this.getAudioDuration(filePath);
+			console.log(`音声ファイル時長: ${Math.round(duration / 60)}分${Math.round(duration % 60)}秒`);
+			
+			// 10MB相当の時間を計算（安全マージンを含む）
+			const fileStats = fs.statSync(filePath);
+			const fileSizeInBytes = fileStats.size;
+			let segmentDuration = Math.floor((duration * 10 * 1024 * 1024) / fileSizeInBytes); // 10MBに対応する時間
+			
+			console.log(`計算された分割時間: ${segmentDuration}秒 (ファイルサイズ: ${fileSizeInBytes}バイト, 時長: ${duration}秒)`);
+			
+			// 最小分割時間を300秒（5分）、最大を600秒（10分）に制限
+			const originalSegmentDuration = segmentDuration;
+			segmentDuration = Math.max(300, Math.min(segmentDuration, 600));
+			
+			console.log(`制限適用後: ${originalSegmentDuration}秒 → ${segmentDuration}秒`);
+			
+			console.log(`分割セグメント長: ${segmentDuration}秒`);
+			
+			// ffmpegで分割実行（元の形式を保持）
+			const originalExt = path.extname(filePath);
+			const outputPattern = path.join(tempDir, `${baseName}_part_%03d${originalExt}`);
+			const ffmpegCommand = `ffmpeg -i "${filePath}" -f segment -segment_time ${segmentDuration} -c copy "${outputPattern}"`;
+			
+			console.log('ffmpegコマンド実行:', ffmpegCommand);
+			const ffmpegResult = await execAsync(ffmpegCommand);
+			console.log('ffmpeg stdout:', ffmpegResult.stdout);
+			console.log('ffmpeg stderr:', ffmpegResult.stderr);
+			
+			// ディレクトリ内の全ファイルを確認
+			console.log('分割後のディレクトリ内容:', fs.readdirSync(tempDir));
+			
+			// 分割されたファイルを検索（元の拡張子で）
+			const escapedBaseName = baseName.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+			const splitPattern = new RegExp(`^${escapedBaseName}_part_\\d{3}\\${originalExt.replace('.', '\\.')}$`);
+			const files = fs.readdirSync(tempDir);
+			
+			console.log(`検索パターン: ${splitPattern}`);
+			console.log(`ベース名: ${baseName}`);
+			console.log(`拡張子: ${originalExt}`);
+			console.log(`エスケープ後ベース名: ${escapedBaseName}`);
+			
+			// テスト用: 期待されるファイル名を手動生成してテスト
+			const expectedFileName = `${baseName}_part_000${originalExt}`;
+			console.log(`期待ファイル名: ${expectedFileName}`);
+			console.log(`期待ファイル名でのテスト: ${splitPattern.test(expectedFileName)}`);
+			
+			for (const file of files) {
+				console.log(`ファイル確認: ${file}, マッチ: ${splitPattern.test(file)}`);
+				// より確実な方法: 文字列マッチング
+				if (file.startsWith(`${baseName}_part_`) && file.endsWith(originalExt)) {
+					console.log(`文字列マッチング成功: ${file}`);
+					splitFiles.push(path.join(tempDir, file));
+				}
+			}
+			
+			splitFiles.sort(); // ファイル名順にソート
+			console.log(`分割完了: ${splitFiles.length}個のファイルに分割されました`);
+			
+			// 各分割ファイルを順次処理
+			const allSegments = [];
+			let totalDuration = 0;
+			let totalSpeakerCount = 1;
+			
+			for (let i = 0; i < splitFiles.length; i++) {
+				console.log(`分割ファイル ${i + 1}/${splitFiles.length} を処理中...`);
+				
+				const segmentResult = await this.processNormalTranscription(splitFiles[i]);
+				console.log(`分割ファイル ${i + 1} 処理結果:`, {
+					hasSegments: !!segmentResult.segments,
+					segmentCount: segmentResult.segments ? segmentResult.segments.length : 0,
+					hasRawText: !!segmentResult.raw_text,
+					rawTextLength: segmentResult.raw_text ? segmentResult.raw_text.length : 0,
+					duration: segmentResult.duration
+				});
+				
+				// タイムスタンプを調整（前のセグメントの終了時間を加算）
+				const adjustedSegments = segmentResult.segments.map(segment => ({
+					...segment,
+					start: segment.start + totalDuration,
+					end: segment.end + totalDuration
+				}));
+				
+				allSegments.push(...adjustedSegments);
+				totalDuration += segmentResult.duration;
+				totalSpeakerCount = Math.max(totalSpeakerCount, segmentResult.speaker_count);
+			}
+			
+			// 分割ファイルを削除
+			for (const splitFile of splitFiles) {
+				if (fs.existsSync(splitFile)) {
+					fs.unlinkSync(splitFile);
+				}
+			}
+			
+			// 統合結果を生成
+			const combinedRawText = allSegments.map(seg => seg.text).join(' ');
+			const combinedFormattedText = allSegments
+				.map(seg => `[${this.formatTimestamp(seg.start)}] ${seg.speaker}: ${seg.text}`)
+				.join('\n');
+			
+			console.log('大容量ファイルの文字起こしが完了しました');
+			console.log(`統合結果: セグメント数=${allSegments.length}, raw_text長=${combinedRawText.length}`);
+			
+			return {
+				raw_text: combinedRawText,
+				formatted_text: combinedFormattedText,
+				segments: allSegments,
+				duration: totalDuration,
+				language: 'ja',
+				speaker_count: totalSpeakerCount
+			};
+			
+		} catch (error) {
+			console.error('大容量ファイル処理エラー:', error);
+			
+			// エラー時に分割ファイルをクリーンアップ
+			for (const splitFile of splitFiles) {
+				try {
+					if (fs.existsSync(splitFile)) {
+						fs.unlinkSync(splitFile);
+					}
+				} catch (cleanupError) {
+					console.error('分割ファイル削除エラー:', cleanupError);
+				}
+			}
+			
+			throw new Error(`大容量ファイル処理に失敗しました: ${error.message}`);
+		}
+	}
+
+	/**
+	 * 音声ファイルの時長を取得
+	 * @param {string} filePath - 音声ファイルのパス
+	 * @returns {Promise<number>} 時長（秒）
+	 */
+	async getAudioDuration(filePath) {
+		const { exec } = require('child_process');
+		const { promisify } = require('util');
+		const execAsync = promisify(exec);
+		
+		try {
+			const command = `ffprobe -v quiet -show_entries format=duration -of csv=p=0 "${filePath}"`;
+			const { stdout } = await execAsync(command);
+			return parseFloat(stdout.trim());
+		} catch (error) {
+			console.error('音声ファイル時長取得エラー:', error);
+			// デフォルト値として推定値を返す（ファイルサイズから）
+			const fileStats = fs.statSync(filePath);
+			const estimatedDuration = fileStats.size / (128 * 1024 / 8); // 128kbps想定
+			return estimatedDuration;
 		}
 	}
 

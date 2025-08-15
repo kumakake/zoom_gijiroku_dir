@@ -1,5 +1,8 @@
 FROM node:18-alpine
 
+# ffmpeg/ffprobeをインストール（25MB超音声ファイル分割処理用）
+RUN apk add --no-cache ffmpeg
+
 # 作業ディレクトリの設定
 WORKDIR /app
 

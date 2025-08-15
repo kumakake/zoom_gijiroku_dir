@@ -18,6 +18,7 @@ const TranscriptWorker = require('../workers/transcriptWorker');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const multer = require('multer');
 
 // データベース接続プール
 const pool = new Pool({
@@ -57,6 +58,38 @@ if (process.env.REDIS_URL) {
 
 // キュー接続キャッシュ
 let queueCache = new Map();
+
+// デバッグ用ファイルアップロード設定
+const debugStorage = multer.diskStorage({
+	destination: (req, file, cb) => {
+		const uploadDir = path.join(__dirname, '../uploads/debug');
+		if (!fs.existsSync(uploadDir)) {
+			fs.mkdirSync(uploadDir, { recursive: true });
+		}
+		cb(null, uploadDir);
+	},
+	filename: (req, file, cb) => {
+		const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+		const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+		cb(null, `debug_${timestamp}_${safeName}`);
+	}
+});
+
+// 最大100MBまでアップロード可能（25MB超ファイルテスト用）
+const debugUpload = multer({ 
+	storage: debugStorage,
+	limits: { 
+		fileSize: 100 * 1024 * 1024 // 100MB
+	},
+	fileFilter: (req, file, cb) => {
+		const allowedTypes = /\.(mp3|m4a|wav|mp4|avi|mov)$/i;
+		if (allowedTypes.test(file.originalname)) {
+			cb(null, true);
+		} else {
+			cb(new Error('音声/動画ファイルのみアップロード可能です'), false);
+		}
+	}
+});
 
 // キュー作成ヘルパー関数（キャッシュなし）
 function createQueue(queueName) {

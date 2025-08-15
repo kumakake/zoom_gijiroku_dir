@@ -333,6 +333,15 @@ class TranscriptWorker {
 					recordingData.accessToken
 				);
 				
+				// 🚨 VTTファイル内容のダンプ（デバッグ用）
+				console.log('📋 VTTファイル内容ダンプ開始 ===========================');
+				console.log('📏 VTTファイルサイズ:', vttContent ? vttContent.length : 'null');
+				console.log('📄 VTTファイル内容:');
+				console.log('---START---');
+				console.log(vttContent);
+				console.log('---END---');
+				console.log('📋 VTTファイル内容ダンプ終了 ===========================');
+				
 				const vttAnalysis = zoomUtils.parseVTTContent(vttContent);
 				
 				if (vttAnalysis.success) {

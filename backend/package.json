@@ -16,6 +16,8 @@
 		"test:meeting-info": "node test-meeting-info-fix.js",
 		"test:meeting-info-only": "jest tests/meeting-info-display.test.js tests/vtt-participant-extraction.test.js tests/email-content-regression.test.js",
 		"test:tenant-admin": "jest tests/tenant-admin-auth.test.js tests/tenant-admin-access.test.js tests/tenant-data-isolation.test.js",
+		"test:e2e": "jest tests/e2e-file-upload.test.js --testTimeout=70000",
+		"test:e2e-large-file": "jest tests/e2e-file-upload.test.js --testNamePattern='大容量ファイル' --testTimeout=70000",
 		"lint": "eslint ."
 	},
 	"dependencies": {

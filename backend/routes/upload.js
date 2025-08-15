@@ -133,8 +133,8 @@ router.post('/audio', [
 
 		// agent_jobsテーブルにジョブを作成
 		const insertQuery = `
-			INSERT INTO agent_jobs (type, status, created_by, data)
-			VALUES ($1, $2, $3, $4)
+			INSERT INTO agent_jobs (type, status, created_by_uuid, tenant_id, data)
+			VALUES ($1, $2, $3, $4, $5)
 			RETURNING id
 		`;
 		
@@ -162,7 +162,8 @@ router.post('/audio', [
 		const values = [
 			isVTTFile ? 'local_vtt_transcript' : 'local_audio_transcript',
 			'pending',
-			req.user.id,
+			req.user.user_uuid,
+			req.user.tenant_id,
 			JSON.stringify({ ...triggerData, ...inputData })
 		];
 		
@@ -280,8 +281,8 @@ router.get('/audio/history', authenticateToken, async (req, res) => {
 		
 		// ユーザーロールに基づくフィルタリング
 		if (req.user.role !== 'admin') {
-			baseQuery += ` AND aj.created_by = $${paramIndex}`;
-			params.push(req.user.id);
+			baseQuery += ` AND aj.created_by_uuid = $${paramIndex}`;
+			params.push(req.user.user_uuid);
 			paramIndex++;
 		}
 		
@@ -358,7 +359,7 @@ router.get('/audio/:jobId', authenticateToken, async (req, res) => {
 		const job = result.rows[0];
 		
 		// 権限チェック（管理者以外は自分のジョブのみ）
-		if (req.user.role !== 'admin' && job.created_by !== req.user.id) {
+		if (req.user.role !== 'admin' && job.created_by_uuid !== req.user.user_uuid) {
 			return res.status(403).json({
 				error: 'このアップロードジョブにアクセスする権限がありません'
 			});
@@ -550,8 +551,19 @@ async function processLocalAudioFile(agentJobId, audioFilePath, inputData) {
 			role: 'host'
 		}];
 		
+		// rawTranscriptがオブジェクトの場合はraw_textを抽出
+		const transcriptText = typeof rawTranscript === 'object' && rawTranscript.raw_text 
+			? rawTranscript.raw_text 
+			: rawTranscript;
+		
+		console.log('Claude APIに送る文字起こしデータ:', {
+			isObject: typeof rawTranscript === 'object',
+			hasRawText: !!(rawTranscript && rawTranscript.raw_text),
+			textLength: typeof transcriptText === 'string' ? transcriptText.length : 0
+		});
+		
 		const formattedResult = await anthropicService.generateMeetingMinutes(
-			rawTranscript,
+			transcriptText,
 			inputData.title,
 			participants
 		);
@@ -565,7 +577,7 @@ async function processLocalAudioFile(agentJobId, audioFilePath, inputData) {
 			startTime: inputData.start_time,
 			duration: estimateDurationFromTranscript(rawTranscript),
 			participants,
-			rawTranscript,
+			rawTranscript: transcriptText, // 修正: 文字列データを使用
 			formattedTranscript: formattedResult.formatted_transcript,
 			summary: formattedResult.summary,
 			actionItems: formattedResult.action_items
@@ -661,33 +673,53 @@ async function saveMeetingTranscript(transcriptData) {
 		actionItems
 	} = transcriptData;
 
+	// agentJobIdからjob_uuidを取得
+	const jobUuidQuery = 'SELECT job_uuid FROM agent_jobs WHERE id = $1';
+	const jobUuidResult = await query(jobUuidQuery, [agentJobId]);
+	
+	if (jobUuidResult.rows.length === 0) {
+		throw new Error(`Agent job not found: ${agentJobId}`);
+	}
+	
+	const jobUuid = jobUuidResult.rows[0].job_uuid;
+
+	// agentJobからtenant_idを取得
+	const agentJobQuery = 'SELECT tenant_id FROM agent_jobs WHERE id = $1';
+	const agentJobResult = await query(agentJobQuery, [agentJobId]);
+	
+	if (agentJobResult.rows.length === 0) {
+		throw new Error(`Agent job not found: ${agentJobId}`);
+	}
+	
+	const tenantId = agentJobResult.rows[0].tenant_id;
+
 	const insertQuery = `
 		INSERT INTO meeting_transcripts (
-			agent_job_id,
+			job_uuid,
+			tenant_id,
 			zoom_meeting_id,
 			meeting_topic,
 			start_time,
 			duration,
 			participants,
-			raw_transcript,
+			content,
 			formatted_transcript,
-			summary,
-			action_items
+			summary
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING id
 	`;
 
 	const values = [
-		agentJobId,
+		jobUuid,
+		tenantId,
 		zoomMeetingId,
 		meetingTopic,
 		startTime,
 		duration,
 		JSON.stringify(participants),
-		rawTranscript,
+		typeof rawTranscript === 'object' ? rawTranscript.raw_text || '' : rawTranscript,
 		formattedTranscript,
-		summary,
-		JSON.stringify(actionItems)
+		summary
 	];
 
 	const result = await query(insertQuery, values);
@@ -696,14 +728,34 @@ async function saveMeetingTranscript(transcriptData) {
 
 /**
  * 文字起こしから会議時間を推定
- * @param {string} transcript - 文字起こしテキスト
+ * @param {string|Object} transcript - 文字起こしテキストまたは処理結果オブジェクト
  * @returns {number} 推定時間（分）
  */
 function estimateDurationFromTranscript(transcript) {
-	// 平均的な話速を1分間に150語として計算
-	const words = transcript.split(/\s+/).length;
-	const estimatedMinutes = Math.ceil(words / 150);
-	return Math.max(estimatedMinutes, 1); // 最低1分
+	// transcriptがオブジェクトの場合（分割処理結果）は duration を使用
+	if (typeof transcript === 'object' && transcript !== null) {
+		if (transcript.duration && typeof transcript.duration === 'number') {
+			return Math.ceil(transcript.duration / 60); // 秒から分に変換
+		}
+		// raw_textがある場合はそれを使用
+		if (transcript.raw_text && typeof transcript.raw_text === 'string') {
+			const words = transcript.raw_text.split(/\s+/).length;
+			const estimatedMinutes = Math.ceil(words / 150);
+			return Math.max(estimatedMinutes, 1);
+		}
+		// デフォルト値
+		return 1;
+	}
+	
+	// transcriptが文字列の場合
+	if (typeof transcript === 'string') {
+		const words = transcript.split(/\s+/).length;
+		const estimatedMinutes = Math.ceil(words / 150);
+		return Math.max(estimatedMinutes, 1); // 最低1分
+	}
+	
+	// その他の場合はデフォルト値
+	return 1;
 }
 
 module.exports = router;
