@@ -178,14 +178,69 @@ const handleRecordingCompleted = async (payload, tenantId) => {
 			return;
 		}
 		
-		// 議事録生成ジョブを作成（テナント付き）
-		const agentJobId = await createAgentJob('recording_completed', payload, null, tenantId);
+		// recording.completed時点ではVTTファイルはまだ生成されていない想定
+		// 常にVTT待機ジョブを作成し、transcript_completedイベントを待つ
+		console.log(`🕐 録画完了 - VTTファイル生成を待機中... (テナント: ${tenantId})`);
+		console.log('利用可能な録画ファイル:', payload.object.recording_files.map(f => ({
+			file_type: f.file_type,
+			file_extension: f.file_extension,
+			recording_type: f.recording_type,
+			file_size: f.file_size
+		})));
+		
+		// VTT待機ジョブを作成（議事録生成ジョブではない）
+		const agentJobId = await createAgentJob('recording_completed_vtt_waiting', payload, null, tenantId);
+		console.log(`🕐 VTT待機ジョブ作成 (テナント: ${tenantId}): ジョブID ${agentJobId} - transcript_completedイベントを待機中`);
+		
+		// 15分後のタイムアウト処理をスケジュール
+		setTimeout(async () => {
+			await handleVTTTimeout(payload.object.id, tenantId, payload);
+		}, 15 * 60 * 1000); // 15分
+		
+		console.log(`🕐 録画完了イベント処理完了 - VTT待機開始 (テナント: ${tenantId}): ジョブID ${agentJobId}`);
+		
+	} catch (error) {
+		console.error(`録画完了イベント処理エラー (テナント: ${tenantId}):`, error);
+		throw error;
+	}
+};
+
+/**
+ * VTT待機タイムアウト処理
+ * recording.completedから一定時間経ってもtranscript_completedが来ない場合のフォールバック
+ * @param {string} meetingId - 会議ID
+ * @param {string} tenantId - テナントID
+ * @param {Object} payload - 元のWebhookペイロード
+ */
+const handleVTTTimeout = async (meetingId, tenantId, payload) => {
+	try {
+		console.log(`⏰ VTTタイムアウト処理開始: 会議ID ${meetingId} (テナント: ${tenantId})`);
+		
+		// 既に処理済みかチェック
+		const existingJobCheck = await db.query(
+			`SELECT id, status FROM agent_jobs 
+			WHERE meeting_id = $1 AND tenant_id = $2 
+			AND type IN ('transcript_completed', 'recording_completed') 
+			AND status IN ('completed', 'processing')
+			ORDER BY created_at DESC LIMIT 1`,
+			[meetingId, tenantId]
+		);
+		
+		if (existingJobCheck.rows.length > 0) {
+			console.log(`🔄 既に処理済み/処理中のため、タイムアウト処理をスキップ: ジョブID ${existingJobCheck.rows[0].id}`);
+			return;
+		}
+		
+		console.log(`🎙️ VTTタイムアウト - Whisper処理で議事録生成開始 (テナント: ${tenantId})`);
+		
+		// Whisper処理用の議事録生成ジョブを作成
+		const agentJobId = await createAgentJob('recording_completed_timeout', payload, null, tenantId);
 		
 		// キューに議事録生成ジョブを追加
 		await queueService.addTranscriptJob({
 			jobId: agentJobId,
 			tenantId: tenantId,
-			type: 'recording_completed',
+			type: 'recording_completed_timeout',
 			meetingData: {
 				meeting_id: payload.object.id,
 				topic: payload.object.topic,
@@ -196,12 +251,69 @@ const handleRecordingCompleted = async (payload, tenantId) => {
 			}
 		});
 		
-		console.log(`録画完了イベント処理完了 (テナント: ${tenantId}): ジョブID ${agentJobId}`);
+		console.log(`⏰ VTTタイムアウト処理完了 (テナント: ${tenantId}): ジョブID ${agentJobId}`);
 		
 	} catch (error) {
-		console.error(`録画完了イベント処理エラー (テナント: ${tenantId}):`, error);
-		throw error;
+		console.error(`⏰ VTTタイムアウト処理エラー (テナント: ${tenantId}):`, error);
 	}
+};
+/**
+ * VTT待機ジョブのタイムアウトスケジューラー
+ * 10分間隔でVTT待機中のジョブをチェックし、15分経過したジョブをタイムアウト処理
+ */
+const startVTTTimeoutScheduler = () => {
+	const VTT_TIMEOUT_MINUTES = 15; // 15分でタイムアウト
+	const CHECK_INTERVAL_MINUTES = 10; // 10分間隔でチェック
+	
+	setInterval(async () => {
+		try {
+			console.log('🕐 VTT待機タイムアウトチェック実行中...');
+			
+			// 15分以上前のVTT待機ジョブを検索
+			const timeoutJobsResult = await db.query(
+				`SELECT id, data, tenant_id, created_at
+				FROM agent_jobs 
+				WHERE type = 'recording_completed_vtt_waiting' 
+				AND status = 'pending'
+				AND created_at < NOW() - INTERVAL '${VTT_TIMEOUT_MINUTES} minutes'
+				ORDER BY created_at ASC`,
+				[]
+			);
+			
+			if (timeoutJobsResult.rows.length === 0) {
+				console.log('🕐 タイムアウト対象のVTT待機ジョブはありません');
+				return;
+			}
+			
+			console.log(`⏰ ${timeoutJobsResult.rows.length}個のVTT待機ジョブがタイムアウトしました`);
+			
+			// 各タイムアウトジョブに対してWhisper処理を実行
+			for (const job of timeoutJobsResult.rows) {
+				try {
+					const payload = JSON.parse(job.data).trigger_data;
+					
+					console.log(`⏰ VTT待機タイムアウト処理: ジョブID ${job.id}, 会議ID ${payload.object.id}`);
+					
+					// タイムアウトジョブのステータスを更新
+					await db.query(
+						'UPDATE agent_jobs SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+						['timeout', job.id]
+					);
+					
+					// Whisper処理を実行
+					await handleVTTTimeout(payload.object.id, job.tenant_id, payload);
+					
+				} catch (jobError) {
+					console.error(`⏰ ジョブID ${job.id} のタイムアウト処理エラー:`, jobError);
+				}
+			}
+			
+		} catch (error) {
+			console.error('🕐 VTT待機タイムアウトチェックエラー:', error);
+		}
+	}, CHECK_INTERVAL_MINUTES * 60 * 1000); // 10分間隔
+	
+	console.log(`🕐 VTT待機タイムアウトスケジューラー開始: ${VTT_TIMEOUT_MINUTES}分でタイムアウト, ${CHECK_INTERVAL_MINUTES}分間隔でチェック`);
 };
 
 // 会議終了イベントの処理（テナント対応）
@@ -251,6 +363,21 @@ const handleTranscriptCompleted = async (payload, tenantId) => {
 				console.log(`🔄 フォールバック：録画ファイル処理に切り替え (テナント: ${tenantId})`);
 				await handleRecordingCompleted(payload, tenantId);
 			}
+			return;
+		}
+		
+		// 重複処理防止チェック
+		const duplicateCheck = await db.query(
+			`SELECT id, status, type FROM agent_jobs 
+			WHERE meeting_id = $1 AND tenant_id = $2 
+			AND type IN ('transcript_completed', 'recording_completed') 
+			AND status IN ('completed', 'processing')
+			ORDER BY created_at DESC LIMIT 1`,
+			[payload.object.id, tenantId]
+		);
+		
+		if (duplicateCheck.rows.length > 0) {
+			console.log(`🔄 既に処理済み/処理中のため、VTT処理をスキップ: ジョブID ${duplicateCheck.rows[0].id} (${duplicateCheck.rows[0].type})`);
 			return;
 		}
 		
@@ -483,5 +610,8 @@ router.get('/', (req, res) => {
 		});
 	}
 });
+
+// VTT待機タイムアウトスケジューラーを開始
+startVTTTimeoutScheduler();
 
 module.exports = router;
