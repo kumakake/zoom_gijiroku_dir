@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Play, ArrowRight, CheckCircle, Star, Users, Clock, Shield, Zap, Brain, TrendingUp, Download, MessageSquare } from 'lucide-react';
+import { Play, ArrowRight, CheckCircle, Star, Users, Clock, Shield, Zap, Brain, TrendingUp, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
 
 const LandingPage = () => {

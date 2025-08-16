@@ -498,35 +498,6 @@ export const TenantAdminPage: React.FC = () => {
                     {zoomSettings.webhook_secret_status === 'configured' ? '設定済み' : '未設定'}
                   </span>
                 </div>
-
-                <div>
-                  <strong>■Zoom イベント</strong>
-                </div>
-                <div>
-                  <strong>Meeting:</strong><span>End Meeting</span>
-                </div>
-                <div>
-                  <strong>Recording:</strong><br />
-				  <span>&emsp;All Recordings have completed</span><br />
-				  <span>&emsp;Recording Transcript files have completed</span>
-                </div>
-
-                <div>
-                  <strong>■Zoom スコープ</strong>
-                </div>
-                <div>
-                  <strong>Meeting:</strong><br />
-				  <span>meeting:read:meeting:admin ( View a meeting ) </span>
-                </div>
-                <div>
-                  <strong>Recording:</strong><br />
-				  <span>cloud_recording:read:recording:admin<br />　( View a recording ) </span><br />
-				  <span>cloud_recording:read:list_recording_files:admin<br />　( Returns all of a meeting's recordings. )</span>
-                </div>
-                <div>
-                  <strong>Report:</strong><br />
-				  <span>report:read:list_meeting_participants:admin<br />　( View meeting participant reports )</span>
-                </div>
               </div>
             ) : (
               <p style={{ color: '#6b7280' }}>Zoom設定が登録されていません</p>
@@ -534,6 +505,101 @@ export const TenantAdminPage: React.FC = () => {
           </div>
         )}
         </div>
+      </div>
+
+      {/* Zoomパラメーター */}
+      <div className="login-card" style={{ marginBottom: '2rem', width: '100%', maxWidth: '1200px' }}>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1.5rem' }}>Zoomパラメーター</h2>
+        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+		  作成したアプリの"Scope" / "Add Event"で設定が必要なパラメータです
+        </label>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ 
+            width: '100%', 
+            borderCollapse: 'collapse',
+            fontSize: '0.875rem'
+          }}>
+            <tbody>
+              <tr>
+                <td rowSpan={3} style={{ 
+                  border: '1px solid #000', 
+                  padding: '0.5rem',
+                  fontWeight: '500',
+                  verticalAlign: 'top',
+                  backgroundColor: '#f8f9fa'
+                }}>
+                  Zoomイベント
+                </td>
+                <td style={{ border: '1px solid #000', padding: '0.5rem' }}>
+                  Meeting
+                </td>
+                <td style={{ border: '1px solid #000', padding: '0.5rem' }}>
+                  End Meeting
+                </td>
+              </tr>
+              <tr>
+                <td style={{ border: '1px solid #000', padding: '0.5rem' }}>
+                  Recording
+                </td>
+                <td style={{ border: '1px solid #000', padding: '0.5rem' }}>
+                  All Recordings have completed
+                </td>
+              </tr>
+              <tr>
+                <td style={{ border: '1px solid #000', padding: '0.5rem' }}>
+                </td>
+                <td style={{ border: '1px solid #000', padding: '0.5rem' }}>
+                  Recording Transcript files have completed
+                </td>
+              </tr>
+              <tr>
+                <td rowSpan={4} style={{ 
+                  border: '1px solid #000', 
+                  padding: '0.5rem',
+                  fontWeight: '500',
+                  verticalAlign: 'top',
+                  backgroundColor: '#f8f9fa'
+                }}>
+                  Zoomスコープ
+                </td>
+                <td style={{ border: '1px solid #000', padding: '0.5rem' }}>
+                  Meeting
+                </td>
+                <td style={{ border: '1px solid #000', padding: '0.5rem' }}>
+                  meeting:read:meeting:admin ( View a meeting )
+                </td>
+              </tr>
+              <tr>
+                <td style={{ border: '1px solid #000', padding: '0.5rem' }}>
+                  Recording
+                </td>
+                <td style={{ border: '1px solid #000', padding: '0.5rem' }}>
+                  cloud_recording:read:recording:admin( View a recording )
+                </td>
+              </tr>
+              <tr>
+                <td style={{ border: '1px solid #000', padding: '0.5rem' }}>
+                </td>
+                <td style={{ border: '1px solid #000', padding: '0.5rem' }}>
+				  cloud_recording:read:list_recording_files:admin( Returns all of a meeting's recordings. )
+                </td>
+              </tr>
+              <tr>
+                <td style={{ border: '1px solid #000', padding: '0.5rem' }}>
+				  Report
+                </td>
+                <td style={{ border: '1px solid #000', padding: '0.5rem' }}>
+				  report:read:list_meeting_participants:admin( View meeting participant reports )
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+		  <br />
+		  Zoomログイン ＞ 管理者/アカウント管理/アカウント設定 ＞ レコーディングとお文字起こしで、"字幕をVTTファイルとして保存する"をチェックしてください。<br />
+		  "そのほかの設定"と"クラウドレコーディング設定"の２箇所にあります。
+        </label>
       </div>
     </div>
   );
