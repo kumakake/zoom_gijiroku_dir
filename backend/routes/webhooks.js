@@ -290,7 +290,8 @@ const startVTTTimeoutScheduler = () => {
 			// 各タイムアウトジョブに対してWhisper処理を実行
 			for (const job of timeoutJobsResult.rows) {
 				try {
-					const payload = JSON.parse(job.data).trigger_data;
+					const jobData = typeof job.data === 'string' ? JSON.parse(job.data) : job.data;
+					const payload = jobData.trigger_data;
 					
 					console.log(`⏰ VTT待機タイムアウト処理: ジョブID ${job.id}, 会議ID ${payload.object.id}`);
 					
