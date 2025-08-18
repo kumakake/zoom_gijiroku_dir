@@ -122,16 +122,75 @@ class TranscriptWorker {
 					if (jobDataResult.rows.length > 0 && jobDataResult.rows[0].output_data) {
 						const outputData = jobDataResult.rows[0].output_data;
 						if (outputData.vtt_speaker_names && Array.isArray(outputData.vtt_speaker_names)) {
-							// VTTから取得した発言者名を参加者として追加
-							const vttParticipants = outputData.vtt_speaker_names.map(name => ({
-								name: name,
-								email: null,
-								source: 'vtt'
-							}));
-							
-							if (vttParticipants.length > 0) {
+							// Zoom API参加者を主軸にして、VTT発言者情報で補強する方式
+							try {
+								console.log('🔍 Zoom APIから全参加者情報を取得開始...');
+								const accessToken = await this.getZoomAccessToken(tenantId);
+								const participantData = await zoomUtils.getParticipantEmails(actualMeetingData.meeting_id || actualMeetingData.object?.id, accessToken);
+								
+								if (participantData.success && participantData.allParticipants.length > 0) {
+									console.log('🔍 Zoom API全参加者情報:', participantData.allParticipants);
+									console.log('🔍 VTT発言者一覧:', outputData.vtt_speaker_names);
+									
+									// Zoom参加者を主軸にして、VTT発言者情報で補強
+									const enhancedParticipants = participantData.allParticipants.map(zoomParticipant => {
+										// VTT発言者名とマッチングを試行
+										const matchedVttSpeaker = outputData.vtt_speaker_names.find(vttSpeaker => {
+											const zoomName = zoomParticipant.name.toLowerCase().trim();
+											const vttName = vttSpeaker.toLowerCase().trim();
+											return zoomName.includes(vttName) || vttName.includes(zoomName) || zoomName === vttName;
+										});
+										
+										if (matchedVttSpeaker) {
+											console.log(`🎤 発言者マッチング: "${zoomParticipant.name}" (${zoomParticipant.email}) ← VTT発言者: "${matchedVttSpeaker}"`);
+											return {
+												name: zoomParticipant.name,
+												email: zoomParticipant.email || null,
+												source: 'zoom_api+vtt_speaker',
+												vtt_speaker_name: matchedVttSpeaker,
+												is_speaker: true,
+												role: 'participant'
+											};
+										} else {
+											// 発言していない参加者
+											return {
+												name: zoomParticipant.name,
+												email: zoomParticipant.email || null,
+												source: 'zoom_api',
+												is_speaker: false,
+												role: 'participant'
+											};
+										}
+									});
+									
+									meetingInfo.participants = enhancedParticipants;
+									console.log('🔍 全参加者情報（発言者+聞き専）:', enhancedParticipants);
+									console.log(`📊 参加者統計: 全${enhancedParticipants.length}名（発言者${enhancedParticipants.filter(p => p.is_speaker).length}名、聞き専${enhancedParticipants.filter(p => !p.is_speaker).length}名）`);
+								} else {
+									console.log('⚠️ Zoom API参加者取得失敗、VTT発言者のみ使用:', participantData.error);
+									// フォールバック: VTT発言者のみ使用
+									const vttParticipants = outputData.vtt_speaker_names.map(name => ({
+										name: name,
+										email: null,
+										source: 'vtt_only',
+										is_speaker: true,
+										role: 'participant'
+									}));
+									meetingInfo.participants = vttParticipants;
+									console.log('🔍 VTTフォールバック参加者情報:', vttParticipants);
+								}
+							} catch (emailError) {
+								console.error('❌ Zoom API参加者取得エラー、VTT発言者のみ使用:', emailError.message);
+								// フォールバック: VTT発言者のみ使用
+								const vttParticipants = outputData.vtt_speaker_names.map(name => ({
+									name: name,
+									email: null,
+									source: 'vtt_fallback',
+									is_speaker: true,
+									role: 'participant'
+								}));
 								meetingInfo.participants = vttParticipants;
-								console.log('🔍 VTTから参加者情報を補完:', vttParticipants);
+								console.log('🔍 VTTエラーフォールバック参加者情報:', vttParticipants);
 							}
 						}
 					}
