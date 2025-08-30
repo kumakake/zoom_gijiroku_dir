@@ -202,7 +202,33 @@ class TranscriptWorker {
 			// 🔍 Anthropic API入力データのログ出力
 			console.log('🔍 Anthropic API入力データ（最初の300文字）:', rawTranscript.substring(0, 300));
 			
-			const transcriptData = await this.anthropicService.generateMeetingMinutes(rawTranscript, meetingInfo);
+			// 5. デフォルトテンプレートを取得（テナント単位）
+			let formatTemplate = null;
+			try {
+				console.log('📋 デフォルトテンプレート取得開始:', { tenantId: jobData.tenant_id });
+				const templateResult = await this.query(`
+					SELECT template_uuid, template_name, format_structure
+					FROM transcript_format_templates
+					WHERE tenant_id = $1 AND is_default = true AND is_active = true
+					LIMIT 1
+				`, [jobData.tenant_id]);
+				
+				if (templateResult.rows.length > 0) {
+					formatTemplate = templateResult.rows[0];
+					console.log('📋 デフォルトテンプレート取得成功:', {
+						templateName: formatTemplate.template_name,
+						templateUuid: formatTemplate.template_uuid,
+						sectionsCount: formatTemplate.format_structure?.sections?.length || 0
+					});
+				} else {
+					console.log('📋 デフォルトテンプレートが見つかりません。標準フォーマットを使用します。');
+				}
+			} catch (templateError) {
+				console.error('📋 テンプレート取得エラー:', templateError);
+				console.log('📋 標準フォーマットにフォールバック');
+			}
+			
+			const transcriptData = await this.anthropicService.generateMeetingMinutes(rawTranscript, meetingInfo, formatTemplate);
 			
 			// 🔍 Anthropic API出力データのログ出力
 			console.log('🔍 Anthropic API出力データ（formatted_transcript最初の300文字）:', transcriptData.formatted_transcript?.substring(0, 300));

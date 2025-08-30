@@ -6,6 +6,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { AppRouter } from './router/AppRouter';
 
 function App() {
+  console.log('📱 App コンポーネント レンダリング');
   // React Queryクライアントの設定
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
@@ -27,6 +28,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
+          {console.log('📱 AuthProvider内部でAppRouter呼び出し')}
           <AppRouter />
           
           {/* Toast通知の設定 */}

@@ -25,11 +25,39 @@ class AnthropicService {
 	 * Claude APIで議事録を高品質に整形・要約
 	 * @param {string} rawTranscript - 生の文字起こしテキスト
 	 * @param {Object} meetingInfo - 会議情報
+	 * @param {Object} formatTemplate - フォーマットテンプレート（オプション）
 	 * @returns {Promise<Object>} 整形された議事録データ
 	 */
-	async generateMeetingMinutes(rawTranscript, meetingInfo) {
+	async generateMeetingMinutes(rawTranscript, meetingInfo, formatTemplate = null) {
 		try {
 			console.log('Claude APIで議事録を生成しています...');
+
+			// テンプレート構造の分析と指示生成
+			let formatInstructions = '';
+			let templateStructureInfo = '';
+			
+			if (formatTemplate && formatTemplate.format_structure && formatTemplate.format_structure.sections) {
+				console.log('📋 カスタムテンプレート使用:', formatTemplate.template_name);
+				templateStructureInfo = `
+## カスタムフォーマット指示
+**重要: 以下のカスタムフォーマットテンプレート "${formatTemplate.template_name}" に従って議事録を構造化してください**
+
+### テンプレート構造:
+${formatTemplate.format_structure.sections.map((section, index) => 
+	`${index + 1}. **${section.title || section.type}**: ${section.description || `${section.type}セクション`}
+   - 含める内容: ${section.fields ? section.fields.map(f => f.label || f.id).join(', ') : 'デフォルト内容'}
+   - 表示形式: ${section.styling?.format || 'マークダウン形式'}`
+).join('\n')}
+
+**formatted_transcript出力時は、上記の構造に厳密に従って各セクションを配置してください。**
+`;
+			} else {
+				console.log('📋 標準フォーマット使用');
+				templateStructureInfo = `
+## 標準フォーマット
+デフォルトの議事録フォーマットを使用します。
+`;
+			}
 
 			const prompt = `
 以下のZoom会議の音声文字起こしデータを元に、プロフェッショナルな議事録を作成してください。
@@ -42,6 +70,8 @@ class AnthropicService {
 
 ## 音声文字起こしデータ
 ${rawTranscript}
+
+${templateStructureInfo}
 
 ## 出力要件
 **重要: 有効なJSONのみを出力してください。コメントや説明は含めず、以下のJSONオブジェクトのみを返してください：**

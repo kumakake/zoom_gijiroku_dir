@@ -3,7 +3,7 @@ import { toast } from 'react-hot-toast';
 
 // API クライアントのベース設定
 const createApiClient = (): AxiosInstance => {
-  const baseURL = import.meta.env.VITE_API_URL || '';
+  const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
   
   const client = axios.create({
     baseURL,
@@ -298,6 +298,47 @@ export const tenantAdminApi = {
 export const systemApi = {
   getSystemStats: async () => {
     const response = await api.get('/admin/stats');
+    return response.data;
+  },
+};
+
+// 議事録フォーマットテンプレート用のAPI
+export const transcriptTemplateApi = {
+  // テンプレート一覧取得
+  getTemplates: async () => {
+    const response = await api.get('/api/transcript-templates');
+    return response.data;
+  },
+
+  // 特定のテンプレート取得
+  getTemplate: async (templateUuid: string) => {
+    const response = await api.get(`/api/transcript-templates/${templateUuid}`);
+    return response.data;
+  },
+
+  // テンプレート作成
+  createTemplate: async (data: object) => {
+    const response = await api.post('/api/transcript-templates', data);
+    return response.data;
+  },
+
+  // テンプレート更新
+  updateTemplate: async (templateUuid: string, data: object) => {
+    const response = await api.put(`/api/transcript-templates/${templateUuid}`, data);
+    return response.data;
+  },
+
+  // テンプレート削除
+  deleteTemplate: async (templateUuid: string) => {
+    const response = await api.delete(`/api/transcript-templates/${templateUuid}`);
+    return response.data;
+  },
+
+  // プレビュー生成
+  generatePreview: async (formatStructure: object) => {
+    const response = await api.post('/api/transcript-templates/preview', {
+      format_structure: formatStructure
+    });
     return response.data;
   },
 };

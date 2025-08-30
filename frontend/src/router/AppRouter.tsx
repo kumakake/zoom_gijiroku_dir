@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 
@@ -17,19 +17,24 @@ import UploadPage from '../pages/UploadPage';
 import DebugPage from '../pages/DebugPage';
 import { TenantsPage } from '../pages/TenantsPage';
 import { TenantAdminPage } from '../pages/TenantAdminPage';
+import { TranscriptFormatPage } from '../pages/TranscriptFormatPage';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
+  console.log('🔒 ProtectedRoute:', { user: !!user, isLoading });
   
   if (isLoading) {
+    console.log('🔒 ProtectedRoute: Loading...');
     return <LoadingSpinner />;
   }
   
   if (!user) {
+    console.log('🔒 ProtectedRoute: No user, redirecting to login');
     return <Navigate to="/login" replace />;
   }
   
+  console.log('🔒 ProtectedRoute: User authenticated, rendering children');
   return <>{children}</>;
 };
 
@@ -87,6 +92,8 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const AppRouter = () => {
+  const location = useLocation();
+  console.log('🚦 AppRouter レンダリング, 現在のパス:', location.pathname);
   return (
     <Routes>
       {/* Public Routes */}
@@ -170,6 +177,22 @@ export const AppRouter = () => {
         <TenantAdminRoute>
           <TenantAdminPage />
         </TenantAdminRoute>
+      } />
+      <Route path="/transcript-formats" element={
+        <ProtectedRoute>
+          <TranscriptFormatPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/transcript-formats/new" element={
+        <ProtectedRoute>
+          {console.log('🚦 TranscriptFormatPage (new) ルート実行')}
+          <TranscriptFormatPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/transcript-formats/edit/:id" element={
+        <ProtectedRoute>
+          <TranscriptFormatPage />
+        </ProtectedRoute>
       } />
       
       {/* Default redirects */}

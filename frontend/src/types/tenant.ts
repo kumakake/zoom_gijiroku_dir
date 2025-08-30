@@ -76,3 +76,52 @@ export interface TenantSearchParams {
 	limit?: number;
 	search?: string;
 }
+
+// 議事録フォーマットテンプレート関連の型定義
+export interface TranscriptFormatTemplate {
+	template_uuid: string;
+	template_name: string;
+	template_description?: string;
+	format_structure: FormatStructure;
+	is_default: boolean;
+	is_active: boolean;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface FormatStructure {
+	sections: FormatSection[];
+	styling: FormatStyling;
+}
+
+export interface FormatSection {
+	id: string;
+	type: 'header' | 'summary' | 'content' | 'action_items' | 'custom';
+	title: string;
+	fields: string[];
+	order: number;
+	custom_content?: string;
+}
+
+export interface FormatStyling {
+	use_markdown: boolean;
+	include_timestamps: boolean;
+	include_speakers: boolean;
+	custom_css?: string;
+}
+
+export interface TranscriptTemplateFormData {
+	template_name: string;
+	template_description?: string;
+	format_structure: FormatStructure;
+	is_default?: boolean;
+}
+
+export interface TemplatePreviewRequest {
+	format_structure: FormatStructure;
+}
+
+export interface TemplatePreviewResponse {
+	preview_html: string;
+	sample_data: Record<string, unknown>;
+}

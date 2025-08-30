@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { tenantAdminApi } from '../lib/api';
 import { toast } from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
-import { Bug, ArrowLeft, Users, BarChart3, Calendar } from 'lucide-react';
+import { Bug, ArrowLeft, Users, BarChart3, Calendar, FileText } from 'lucide-react';
 
 interface TenantInfo {
   tenant_id: string;
@@ -140,6 +140,11 @@ export const TenantAdminPage: React.FC = () => {
     navigate('/debug');
   };
 
+  // 議事録フォーマット管理に移動
+  const handleFormatManagement = () => {
+    navigate('/transcript-formats');
+  };
+
   if (loading) {
     return (
       <div style={{
@@ -173,6 +178,25 @@ export const TenantAdminPage: React.FC = () => {
           テナント管理
         </h1>
         <div style={{ display: 'flex', gap: '1rem' }}>
+          <button
+            onClick={handleFormatManagement}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              backgroundColor: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '0.5rem',
+              padding: '0.75rem 1rem',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              fontWeight: '500'
+            }}
+          >
+            <FileText style={{ width: '1rem', height: '1rem' }} />
+            議事録フォーマット管理
+          </button>
           <button
             onClick={handleDebugDashboard}
             style={{
